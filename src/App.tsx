@@ -54,6 +54,7 @@ import {
   DATABASE_NAME,
   subscribeToFirebaseDrawings,
   subscribeToFirebaseDepartments,
+  testFirebaseConnection,
 } from './services/firebase';
 import { soundEffects } from './services/sound';
 
@@ -298,6 +299,9 @@ export default function App() {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+
+    // Test Firebase connection
+    testFirebaseConnection();
 
     // Firebase real-time snapshot listeners
     let unsubFbDrawings: (() => void) | null = null;

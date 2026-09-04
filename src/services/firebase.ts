@@ -1,11 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
   getFirestore,
+  initializeFirestore,
   Firestore,
   collection,
   doc,
   getDocs,
   getDoc,
+  getDocFromServer,
   setDoc,
   deleteDoc,
   onSnapshot,
@@ -46,12 +48,37 @@ export function getFirebaseApp() {
 export function getFirebaseDb(): Firestore {
   if (!dbInstance) {
     const app = getFirebaseApp();
-    dbInstance = getFirestore(app, DATABASE_NAME);
+    try {
+      // Use experimentalForceLongPolling to bypass WebChannel stream timeout in iframes / proxies
+      dbInstance = initializeFirestore(
+        app,
+        {
+          experimentalForceLongPolling: true,
+        },
+        DATABASE_NAME
+      );
+    } catch {
+      dbInstance = getFirestore(app, DATABASE_NAME);
+    }
   }
   return dbInstance;
 }
 
-// Clean object to avoid Firestore "undefined field value" error
+// Test connection to verify online reachability
+export async function testFirebaseConnection(): Promise<boolean> {
+  try {
+    const db = getFirebaseDb();
+    await getDocFromServer(doc(db, 'test', 'connection'));
+    return true;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('Firebase connection test: Operating in offline mode with cached data.');
+    }
+    return false;
+  }
+}
+
+// Clean object to avoid Firestore "undefined field value" error and prevent >1MB document size limit
 function sanitizeData(data: any): any {
   if (data === undefined) return null;
   if (data === null) return null;
@@ -62,6 +89,10 @@ function sanitizeData(data: any): any {
     const clean: Record<string, any> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) {
+        // Strip out large dataUrl (>50KB) so Firestore 1MB document limit is never exceeded
+        if (key === 'dataUrl' && typeof value === 'string' && value.length > 50000) {
+          continue;
+        }
         clean[key] = sanitizeData(value);
       }
     }
@@ -256,25 +287,43 @@ export async function syncAllToFirebaseDatabase(
 
 // 7. Real-time Snapshot Subscriptions
 export function subscribeToFirebaseDrawings(callback: (drawings: Drawing[]) => void): Unsubscribe {
-  const db = getFirebaseDb();
-  return onSnapshot(collection(db, 'drawings'), (snapshot) => {
-    if (!snapshot.empty) {
-      const dwgs = snapshot.docs.map((d) => d.data() as Drawing);
-      callback(dwgs);
-    }
-  }, (err) => {
-    console.warn('Firebase drawings snapshot subscription error:', err);
-  });
+  try {
+    const db = getFirebaseDb();
+    return onSnapshot(
+      collection(db, 'drawings'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const dwgs = snapshot.docs.map((d) => d.data() as Drawing);
+          callback(dwgs);
+        }
+      },
+      (err) => {
+        console.warn('Firebase drawings snapshot subscription notice:', err?.message || err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to drawings snapshot:', err);
+    return () => {};
+  }
 }
 
 export function subscribeToFirebaseDepartments(callback: (depts: DepartmentInfo[]) => void): Unsubscribe {
-  const db = getFirebaseDb();
-  return onSnapshot(collection(db, 'departments'), (snapshot) => {
-    if (!snapshot.empty) {
-      const depts = snapshot.docs.map((d) => d.data() as DepartmentInfo);
-      callback(depts);
-    }
-  }, (err) => {
-    console.warn('Firebase departments snapshot subscription error:', err);
-  });
+  try {
+    const db = getFirebaseDb();
+    return onSnapshot(
+      collection(db, 'departments'),
+      (snapshot) => {
+        if (!snapshot.empty) {
+          const depts = snapshot.docs.map((d) => d.data() as DepartmentInfo);
+          callback(depts);
+        }
+      },
+      (err) => {
+        console.warn('Firebase departments snapshot subscription notice:', err?.message || err);
+      }
+    );
+  } catch (err) {
+    console.warn('Failed to subscribe to departments snapshot:', err);
+    return () => {};
+  }
 }

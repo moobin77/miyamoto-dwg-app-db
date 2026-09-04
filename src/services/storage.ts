@@ -1,4 +1,4 @@
-import { Drawing, OfflineQueueItem, DepartmentInfo } from '../types';
+import { Drawing, OfflineQueueItem, DepartmentInfo, AttachedDrawingFile } from '../types';
 import { INITIAL_DRAWINGS } from '../data/sampleDrawings';
 import { INITIAL_DEPARTMENTS } from '../data/departmentsData';
 
@@ -63,7 +63,22 @@ export function getLocalDrawings(): Drawing[] {
 
 export function saveLocalDrawings(drawings: Drawing[]): void {
   try {
-    localStorage.setItem(DRAWINGS_KEY, JSON.stringify(drawings));
+    // Strip giant dataUrls (>30KB) before saving to localStorage to prevent QuotaExceededError
+    const safeDrawings = drawings.map((d) => {
+      if (!d.attachedFiles || d.attachedFiles.length === 0) return d;
+      return {
+        ...d,
+        attachedFiles: d.attachedFiles.map((f) => {
+          if (f.dataUrl && f.dataUrl.length > 30000) {
+            // Keep fileUrl and omit the giant base64 dataUrl from localStorage
+            const { dataUrl, ...rest } = f;
+            return rest as AttachedDrawingFile;
+          }
+          return f;
+        }),
+      };
+    });
+    localStorage.setItem(DRAWINGS_KEY, JSON.stringify(safeDrawings));
   } catch (e) {
     console.error('Failed to cache drawings locally:', e);
   }

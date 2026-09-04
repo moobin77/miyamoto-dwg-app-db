@@ -781,6 +781,31 @@ class ApiService {
     }
   }
 
+  // Upload binary CAD/PDF/Image file to server storage
+  async uploadFile(file: File): Promise<{
+    success: boolean;
+    fileName: string;
+    savedFilename: string;
+    fileUrl: string;
+    fileSize: string;
+    fileType: 'PDF' | 'DXF' | 'DWG' | 'STEP' | 'SVG' | 'IMAGE';
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+      throw new Error(err.error || `Upload failed with status ${res.status}`);
+    }
+
+    return res.json();
+  }
+
   // Admin attaches a drawing file (PDF, DXF, DWG, STEP, SVG, PNG)
   async addDrawingFile(
     drawingId: string,
@@ -818,6 +843,8 @@ class ApiService {
       d.attachedFiles.unshift(localFile);
       d.lastUpdated = localFile.uploadedAt;
       saveLocalDrawings(localDrawings);
+      // Sync to Firebase Firestore (miyamoto-dwg-app-db)
+      saveDrawingToFirestore(d).catch(console.warn);
     }
 
     if (!isOnline) {
@@ -837,6 +864,9 @@ class ApiService {
         body: JSON.stringify(fileData),
       });
       const data = await res.json();
+      if (data.drawing) {
+        saveDrawingToFirestore(data.drawing).catch(console.warn);
+      }
       soundEffects.playSuccessChime();
       return data;
     } catch {

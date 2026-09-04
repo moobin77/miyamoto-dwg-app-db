@@ -601,7 +601,8 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                     />
                   </div>
                 ) : activeViewFile.fileType === 'PDF' ||
-                  (activeViewFile.dataUrl && activeViewFile.dataUrl.startsWith('data:application/pdf')) ? (
+                  (activeViewFile.dataUrl && activeViewFile.dataUrl.startsWith('data:application/pdf')) ||
+                  (activeViewFile.fileUrl && (activeViewFile.fileUrl.includes('drive.google.com') || activeViewFile.fileUrl.toLowerCase().includes('.pdf') || activeViewFile.fileUrl.startsWith('/api/files/'))) ? (
                   <div className="w-[85vw] max-w-4xl h-[70vh] rounded-xl border border-slate-800 bg-slate-950 overflow-hidden flex flex-col">
                     <iframe
                       src={activeViewFile.dataUrl || activeViewFile.fileUrl}
@@ -625,7 +626,7 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                         </p>
                       )}
                     </div>
-                    {activeViewFile.dataUrl && (
+                    {activeViewFile.dataUrl ? (
                       <a
                         href={activeViewFile.dataUrl}
                         download={activeViewFile.fileName}
@@ -633,7 +634,16 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                       >
                         <Download className="w-4 h-4" /> ดาวน์โหลดไฟล์เข้าเครื่องจักร CNC
                       </a>
-                    )}
+                    ) : activeViewFile.fileUrl ? (
+                      <a
+                        href={activeViewFile.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/30 transition"
+                      >
+                        <ExternalLink className="w-4 h-4" /> เปิดหรือดาวน์โหลดไฟล์งาน ({activeViewFile.fileType})
+                      </a>
+                    ) : null}
                   </div>
                 )}
               </div>

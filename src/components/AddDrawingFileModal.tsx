@@ -15,8 +15,13 @@ import {
   HardDrive,
   FileCheck,
   AlertCircle,
+  Cloud,
+  Globe,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { Drawing, AttachedDrawingFile } from '../types';
+import { api } from '../services/api';
 
 interface AddDrawingFileModalProps {
   isOpen: boolean;
@@ -41,7 +46,7 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
   onSubmitFile,
   onOpenParametricCreator,
 }) => {
-  const [activeTab, setActiveTab] = useState<'UPLOAD' | 'PARAMETRIC' | 'CLOUD'>('UPLOAD');
+  const [activeTab, setActiveTab] = useState<'UPLOAD' | 'GDRIVE' | 'PARAMETRIC' | 'CLOUD'>('UPLOAD');
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -51,7 +56,12 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
   const [error, setError] = useState('');
+
+  // Google Drive State
+  const [googleDriveUrl, setGoogleDriveUrl] = useState('');
+  const [googleDriveFileName, setGoogleDriveFileName] = useState('');
 
   // Cloud URL state
   const [cloudUrl, setCloudUrl] = useState('');
@@ -79,6 +89,20 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
     if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'].includes(ext)) return 'IMAGE';
     return 'PDF';
   };
+
+  // Parse Google Drive file ID from link
+  const extractGoogleDriveId = (input: string): string | null => {
+    if (!input) return null;
+    const trimmed = input.trim();
+    const matchD = trimmed.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+    if (matchD) return matchD[1];
+    const matchId = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+    if (matchId) return matchId[1];
+    if (/^[a-zA-Z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+    return null;
+  };
+
+  const detectedDriveId = extractGoogleDriveId(googleDriveUrl);
 
   const handleProcessFile = (file: File) => {
     setSelectedFile(file);
@@ -150,13 +174,58 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           return;
         }
 
+        setUploadStatus('กำลังอัปโหลดไฟล์เข้าสู่ที่เก็บไฟล์ระบบ...');
+        let uploadedFileUrl = '';
+        let detectedSize = formatSize(selectedFile.size);
+        let detectedFileType = fileType;
+
+        try {
+          // Upload binary CAD/PDF directly to server disk storage
+          const uploadRes = await api.uploadFile(selectedFile);
+          uploadedFileUrl = uploadRes.fileUrl;
+          detectedSize = uploadRes.fileSize;
+          detectedFileType = uploadRes.fileType;
+        } catch (uploadErr: any) {
+          console.warn('Direct upload server error, falling back if possible:', uploadErr);
+          if (selectedFile.size > 2 * 1024 * 1024) {
+            throw new Error(`อัปโหลดไฟล์ล้มเหลว: ${uploadErr.message}`);
+          }
+        }
+
         await onSubmitFile(drawing.id, {
           fileName: selectedFile.name,
-          fileType,
-          fileSize: formatSize(selectedFile.size),
+          fileType: detectedFileType,
+          fileSize: detectedSize,
           source: 'DIRECT_UPLOAD',
-          dataUrl: fileDataUrl,
-          notes: notes.trim() || 'อัปโหลดโดยแอดมิน',
+          fileUrl: uploadedFileUrl || undefined,
+          dataUrl: uploadedFileUrl ? undefined : fileDataUrl,
+          notes: notes.trim() || 'อัปโหลดเข้าคลังไฟล์ระบบ',
+        });
+      } else if (activeTab === 'GDRIVE') {
+        if (!googleDriveUrl.trim()) {
+          setError('กรุณาระบุลิงก์ Google Drive หรือ File ID');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const driveId = extractGoogleDriveId(googleDriveUrl);
+        const previewUrl = driveId
+          ? `https://drive.google.com/file/d/${driveId}/preview`
+          : googleDriveUrl.trim();
+
+        const name =
+          googleDriveFileName.trim() ||
+          `${drawing.code}_CAD_Drive.${fileType === 'IMAGE' ? 'png' : fileType.toLowerCase()}`;
+
+        await onSubmitFile(drawing.id, {
+          fileName: name,
+          fileType,
+          fileSize: 'Google Drive Cloud',
+          source: 'PDM_SYNC',
+          fileUrl: previewUrl,
+          notes:
+            notes.trim() ||
+            `เชื่อมโยงจาก Google Drive (${driveId ? `File ID: ${driveId}` : 'Shared Link'})`,
         });
       } else if (activeTab === 'CLOUD') {
         if (!cloudUrl.trim()) {
@@ -180,6 +249,7 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
       setError(err.message || 'เกิดข้อผิดพลาดในการแนบไฟล์');
     } finally {
       setIsSubmitting(false);
+      setUploadStatus('');
     }
   };
 
@@ -219,22 +289,38 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           </p>
         </div>
 
-        {/* 3 Methods Tab Selector */}
-        <div className="grid grid-cols-3 border-b border-slate-800 bg-slate-900 text-xs font-semibold">
+        {/* 4 Methods Tab Selector */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-b border-slate-800 bg-slate-900 text-xs font-semibold">
           <button
             type="button"
             onClick={() => {
               setActiveTab('UPLOAD');
               setError('');
             }}
-            className={`py-3 px-4 flex items-center justify-center gap-2 border-b-2 transition ${
+            className={`py-3 px-3 flex items-center justify-center gap-1.5 border-b-2 transition ${
               activeTab === 'UPLOAD'
                 ? 'border-blue-500 text-blue-400 bg-blue-500/10 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             <HardDrive className="w-4 h-4" />
-            <span>1. อัปโหลดไฟล์ตรง (Direct Upload)</span>
+            <span>1. อัปโหลดตรง (Server)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('GDRIVE');
+              setError('');
+            }}
+            className={`py-3 px-3 flex items-center justify-center gap-1.5 border-b-2 transition ${
+              activeTab === 'GDRIVE'
+                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            <span>2. Google Drive (แนะนำ)</span>
           </button>
 
           <button
@@ -243,14 +329,14 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
               setActiveTab('PARAMETRIC');
               setError('');
             }}
-            className={`py-3 px-4 flex items-center justify-center gap-2 border-b-2 transition ${
+            className={`py-3 px-3 flex items-center justify-center gap-1.5 border-b-2 transition ${
               activeTab === 'PARAMETRIC'
                 ? 'border-indigo-500 text-indigo-400 bg-indigo-500/10 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             <Sparkles className="w-4 h-4" />
-            <span>2. ระบบ Parametric (สร้างในระบบ)</span>
+            <span>3. Parametric CAD</span>
           </button>
 
           <button
@@ -259,14 +345,14 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
               setActiveTab('CLOUD');
               setError('');
             }}
-            className={`py-3 px-4 flex items-center justify-center gap-2 border-b-2 transition ${
+            className={`py-3 px-3 flex items-center justify-center gap-1.5 border-b-2 transition ${
               activeTab === 'CLOUD'
-                ? 'border-emerald-500 text-emerald-400 bg-emerald-500/10 font-bold'
+                ? 'border-cyan-500 text-cyan-400 bg-cyan-500/10 font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
             }`}
           >
             <Link2 className="w-4 h-4" />
-            <span>3. เชื่อมต่อ PDM / Cloud Vault</span>
+            <span>4. PDM / Vault Link</span>
           </button>
         </div>
 
@@ -431,11 +517,183 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
                   className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition flex items-center gap-1.5 shadow-lg shadow-blue-600/30 disabled:opacity-50"
                 >
                   {isSubmitting ? (
-                    <span>กำลังอัปโหลด...</span>
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{uploadStatus || 'กำลังอัปโหลด...'}</span>
+                    </>
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
                       <span>อัปโหลดและแนบไฟล์เข้าระบบ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* TAB: GOOGLE DRIVE INTEGRATION */}
+          {activeTab === 'GDRIVE' && (
+            <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-slate-300 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="w-5 h-5 text-emerald-400" />
+                  <h4 className="text-sm font-bold text-white">
+                    วิธีที่ 2: เชื่อมต่อไฟล์ CAD/DWG/PDF จาก Google Drive (แนะนำสำหรับโรงงาน)
+                  </h4>
+                </div>
+                <p className="leading-relaxed">
+                  หากฝ่ายออกแบบหรือ R&amp;D จัดเก็บไฟล์ไว้บน <strong>Google Drive</strong> หรือ <strong>Shared Drive</strong>{' '}
+                  คุณสามารถคัดลอกลิงก์มาวางได้ทันที แท็บเล็ตหน้างานจะสามารถแสดงผลตัวอย่างแบบ (Live Embedded Preview) และเปิดดูสเปกได้โดยตรง โดยไม่เปลืองพื้นที่เซิร์ฟเวอร์
+                </p>
+
+                {/* Step-by-Step Guide */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
+                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">1. อัปโหลดลง Drive</span>
+                    <p className="text-[10px] text-slate-400">
+                      อัปโหลดไฟล์ PDF, DWG, DXF หรือ STEP ลงโฟลเดอร์ Google Drive ของบริษัท
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
+                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">2. เปิดแชร์ลิงก์</span>
+                    <p className="text-[10px] text-slate-400">
+                      คลิกขวาที่ไฟล์ &rarr; แชร์ (Share) &rarr; เลือก <strong>ทุกคนที่มีลิงก์ (Anyone with the link)</strong>
+                    </p>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
+                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">3. วางลิงก์ที่นี่</span>
+                    <p className="text-[10px] text-slate-400">
+                      คัดลอกลิงก์มาวางในช่องด้านล่าง ระบบจะถอดรหัส File ID และจัดเตรียมวิวเวอร์ให้อัตโนมัติ
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* URL Input */}
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  วางลิงก์ Google Drive หรือ File ID <span className="text-rose-400">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={googleDriveUrl}
+                    onChange={(e) => setGoogleDriveUrl(e.target.value)}
+                    placeholder="https://drive.google.com/file/d/1a2b3c4d5e.../view?usp=sharing"
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 font-mono text-xs focus:outline-none focus:border-emerald-500 transition"
+                    required
+                  />
+                  {detectedDriveId && (
+                    <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-emerald-400">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
+
+                {detectedDriveId ? (
+                  <div className="mt-1.5 flex items-center justify-between text-[11px] text-emerald-400">
+                    <span>✓ ตรวจพบ Google Drive File ID: <code className="bg-emerald-950 px-1 py-0.5 rounded text-emerald-300">{detectedDriveId}</code></span>
+                    <a
+                      href={`https://drive.google.com/file/d/${detectedDriveId}/view`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-blue-400 hover:underline flex items-center gap-1"
+                    >
+                      <span>ทดสอบเปิดดูใน Drive</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                ) : googleDriveUrl.trim() ? (
+                  <p className="mt-1.5 text-[11px] text-amber-400">
+                    ⚠️ ยังไม่ตรวจพบรูปแบบ Drive ID มาตรฐาน แต่ระบบจะบันทึกเป็น Web Link เชื่อมโยงภายนอก
+                  </p>
+                ) : (
+                  <div className="mt-2 flex items-center justify-between text-[11px]">
+                    <span className="text-slate-500">รองรับทุกลิงก์: drive.google.com/file/d/..., open?id=... หรือ File ID ตรง</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setGoogleDriveUrl('https://drive.google.com/file/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/view?usp=sharing');
+                        setGoogleDriveFileName(`${drawing.code}_Sample_Drive_CAD.pdf`);
+                      }}
+                      className="text-emerald-400 hover:text-emerald-300 font-medium underline"
+                    >
+                      กดเพื่อลองวางลิงก์ตัวอย่าง
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    ชื่อไฟล์ที่แสดง (Display File Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={googleDriveFileName}
+                    onChange={(e) => setGoogleDriveFileName(e.target.value)}
+                    placeholder={`${drawing.code}_GoogleDrive_Master.pdf`}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-emerald-500 transition"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-medium mb-1">
+                    ประเภทของไฟล์บน Drive
+                  </label>
+                  <select
+                    value={fileType}
+                    onChange={(e) => setFileType(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-emerald-500 transition"
+                  >
+                    <option value="PDF">PDF Drawing (แสดงตัวอย่างบนจอเครื่องจักรได้ทันที)</option>
+                    <option value="DXF">AutoCAD DXF File</option>
+                    <option value="DWG">AutoCAD DWG Drawing</option>
+                    <option value="STEP">STEP / IGES 3D Solid Model</option>
+                    <option value="IMAGE">ภาพพิมพ์เขียวสแกน (PNG / JPG)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-medium mb-1">
+                  หมายเหตุ / โฟลเดอร์ต้นทาง
+                </label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="เช่น เก็บใน Shared Drive: Engineering / Release_2025"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold transition"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !googleDriveUrl.trim()}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/30 disabled:opacity-50"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>กำลังบันทึก...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Globe className="w-4 h-4" />
+                      <span>เชื่อมต่อไฟล์จาก Google Drive</span>
                     </>
                   )}
                 </button>
@@ -502,19 +760,19 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
             </div>
           )}
 
-          {/* TAB 3: CLOUD PDM / VAULT SYNC */}
+          {/* TAB 4: CLOUD PDM / VAULT SYNC */}
           {activeTab === 'CLOUD' && (
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-slate-300 space-y-2">
+              <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-slate-300 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Link2 className="w-5 h-5 text-emerald-400" />
+                  <Link2 className="w-5 h-5 text-cyan-400" />
                   <h4 className="text-sm font-bold text-white">
-                    วิธีที่ 3: เชื่อมโยงไฟล์จาก Cloud PDM / Autodesk Vault / ERP
+                    วิธีที่ 4: เชื่อมโยงไฟล์จาก Cloud PDM / Autodesk Vault / ERP
                   </h4>
                 </div>
                 <p className="leading-relaxed">
-                  สำหรับโรงงานที่จัดเก็บไฟล์ CAD กลางไว้บนระบบ SolidWorks PDM, Autodesk Vault, Google
-                  Drive, หรือ Nextcloud แอดมินสามารถวาง URL เชื่อมโยงได้ เพื่อให้แท็บเล็ตดึงไฟล์ล่าสุดอัตโนมัติ
+                  สำหรับโรงงานที่จัดเก็บไฟล์ CAD กลางไว้บนระบบ SolidWorks PDM, Autodesk Vault, Nextcloud, หรือ Webhook
+                  แอดมินสามารถวาง URL เชื่อมโยงได้ เพื่อให้แท็บเล็ตดึงไฟล์ล่าสุดอัตโนมัติ
                 </p>
               </div>
 
@@ -648,9 +906,19 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
                         href={file.fileUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-[11px] font-medium transition"
+                        className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-[11px] font-medium transition flex items-center gap-1"
                       >
-                        เปิดลิงก์ PDM
+                        {file.fileUrl.includes('drive.google.com') ? (
+                          <>
+                            <Globe className="w-3 h-3" />
+                            <span>เปิดดูบน Google Drive</span>
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="w-3 h-3" />
+                            <span>เปิดดูไฟล์</span>
+                          </>
+                        )}
                       </a>
                     ) : null}
                   </div>

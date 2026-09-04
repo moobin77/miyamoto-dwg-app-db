@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import { INITIAL_DRAWINGS } from './src/data/sampleDrawings.ts';
 import { INITIAL_DEPARTMENTS, createDrawingForLength } from './src/data/departmentsData.ts';
@@ -20,6 +22,30 @@ const PORT = 3000;
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Dedicated Uploads Storage Directory for CAD / PDF / DXF / STEP files
+const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+// Multer Storage Configuration
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-\u0E00-\u0E7F]/g, '_');
+    cb(null, `${uniqueSuffix}-${baseName}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB maximum per file
+});
 
 // In-memory server-authoritative store
 let departments: DepartmentInfo[] = JSON.parse(JSON.stringify(INITIAL_DEPARTMENTS));
@@ -72,6 +98,75 @@ function broadcast(eventType: string, data: any) {
 // 1. Health check
 app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', time: new Date().toISOString(), connectedClients: sseClients.length });
+});
+
+// Dedicated File Upload Endpoint (for PDF, CAD, DXF, DWG, STEP, SVG, Images)
+app.post('/api/upload', upload.single('file'), (req: Request, res: Response) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'ไม่พบไฟล์ที่ต้องการอัปโหลด' });
+  }
+
+  const fileUrl = `/api/files/${encodeURIComponent(req.file.filename)}`;
+  const ext = path.extname(req.file.originalname).toLowerCase().replace('.', '');
+  let detectedType: 'PDF' | 'DXF' | 'DWG' | 'STEP' | 'SVG' | 'IMAGE' = 'PDF';
+  if (ext === 'pdf') detectedType = 'PDF';
+  else if (ext === 'dxf') detectedType = 'DXF';
+  else if (ext === 'dwg') detectedType = 'DWG';
+  else if (['stp', 'step', 'iges', 'igs'].includes(ext)) detectedType = 'STEP';
+  else if (ext === 'svg') detectedType = 'SVG';
+  else if (['png', 'jpg', 'jpeg', 'webp', 'bmp', 'tiff'].includes(ext)) detectedType = 'IMAGE';
+
+  const size = req.file.size < 1024 * 1024
+    ? `${(req.file.size / 1024).toFixed(1)} KB`
+    : `${(req.file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+  res.json({
+    success: true,
+    fileName: req.file.originalname,
+    savedFilename: req.file.filename,
+    fileUrl,
+    fileSize: size,
+    fileType: detectedType,
+    mimetype: req.file.mimetype,
+  });
+});
+
+// Serve Uploaded Files with proper headers
+app.get('/api/files/:filename', (req: Request, res: Response) => {
+  const filename = decodeURIComponent(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, filename);
+
+  // Guard against path traversal
+  if (!filePath.startsWith(UPLOADS_DIR)) {
+    return res.status(403).json({ error: 'Access denied' });
+  }
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'File not found' });
+  }
+
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === '.pdf') {
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+  } else if (ext === '.svg') {
+    res.setHeader('Content-Type', 'image/svg+xml');
+  } else if (ext === '.png') {
+    res.setHeader('Content-Type', 'image/png');
+  } else if (ext === '.jpg' || ext === '.jpeg') {
+    res.setHeader('Content-Type', 'image/jpeg');
+  } else if (ext === '.dxf') {
+    res.setHeader('Content-Type', 'application/dxf');
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+  } else if (ext === '.dwg') {
+    res.setHeader('Content-Type', 'application/acad');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+  } else if (ext === '.step' || ext === '.stp') {
+    res.setHeader('Content-Type', 'application/step');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+  }
+
+  res.sendFile(filePath);
 });
 
 // 2. Real-time SSE endpoint
