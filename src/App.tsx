@@ -945,6 +945,14 @@ export default function App() {
           }}
           drawing={targetDrawingForFile || activeDrawing}
           onSubmit={handleSubmitAddDrawingFile}
+          onSubmitFile={handleSubmitAddDrawingFile}
+          onOpenParametricCreator={() => {
+            const target = targetDrawingForFile || activeDrawing;
+            if (target) {
+              setEditingDrawing(target);
+              setIsEditJobModalOpen(true);
+            }
+          }}
         />
       )}
 

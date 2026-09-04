@@ -27,7 +27,16 @@ interface AddDrawingFileModalProps {
   isOpen: boolean;
   onClose: () => void;
   drawing: Drawing | null;
-  onSubmitFile: (drawingId: string, fileData: {
+  onSubmitFile?: (drawingId: string, fileData: {
+    fileName: string;
+    fileType: 'PDF' | 'DXF' | 'DWG' | 'STEP' | 'SVG' | 'IMAGE';
+    fileSize: string;
+    source: 'DIRECT_UPLOAD' | 'PARAMETRIC_CAD' | 'PDM_SYNC';
+    dataUrl?: string;
+    fileUrl?: string;
+    notes?: string;
+  }) => Promise<void>;
+  onSubmit?: (drawingId: string, fileData: {
     fileName: string;
     fileType: 'PDF' | 'DXF' | 'DWG' | 'STEP' | 'SVG' | 'IMAGE';
     fileSize: string;
@@ -44,8 +53,10 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
   onClose,
   drawing,
   onSubmitFile,
+  onSubmit,
   onOpenParametricCreator,
 }) => {
+  const handleSaveDrawingFile = onSubmitFile || onSubmit;
   const [activeTab, setActiveTab] = useState<'UPLOAD' | 'GDRIVE' | 'PARAMETRIC' | 'CLOUD'>('UPLOAD');
 
   // File Upload State
@@ -192,7 +203,11 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           }
         }
 
-        await onSubmitFile(drawing.id, {
+        if (!handleSaveDrawingFile) {
+          throw new Error('ไม่พบฟังก์ชันสำหรับบันทึกไฟล์ (Callback handler not found)');
+        }
+
+        await handleSaveDrawingFile(drawing.id, {
           fileName: selectedFile.name,
           fileType: detectedFileType,
           fileSize: detectedSize,
@@ -208,6 +223,10 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           return;
         }
 
+        if (!handleSaveDrawingFile) {
+          throw new Error('ไม่พบฟังก์ชันสำหรับบันทึกไฟล์ (Callback handler not found)');
+        }
+
         const driveId = extractGoogleDriveId(googleDriveUrl);
         const previewUrl = driveId
           ? `https://drive.google.com/file/d/${driveId}/preview`
@@ -217,7 +236,7 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           googleDriveFileName.trim() ||
           `${drawing.code}_CAD_Drive.${fileType === 'IMAGE' ? 'png' : fileType.toLowerCase()}`;
 
-        await onSubmitFile(drawing.id, {
+        await handleSaveDrawingFile(drawing.id, {
           fileName: name,
           fileType,
           fileSize: 'Google Drive Cloud',
@@ -234,8 +253,12 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
           return;
         }
 
+        if (!handleSaveDrawingFile) {
+          throw new Error('ไม่พบฟังก์ชันสำหรับบันทึกไฟล์ (Callback handler not found)');
+        }
+
         const name = cloudFileName.trim() || `${drawing.code}_CAD_Vault.pdf`;
-        await onSubmitFile(drawing.id, {
+        await handleSaveDrawingFile(drawing.id, {
           fileName: name,
           fileType,
           fileSize: 'Cloud Stream',
