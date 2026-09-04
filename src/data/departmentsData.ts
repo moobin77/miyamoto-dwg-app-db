@@ -7,10 +7,30 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
     name: 'แผนก SAS',
     nameEn: 'Suspension & Actuator Systems',
     description: 'ระบบกันสะเทือน, กระบอกสูบไฮดรอลิก และแอคชูเอเตอร์เชิงกล',
+    series: [
+      {
+        id: 'series-sas-01',
+        departmentId: 'SAS',
+        code: 'SAS-C-SERIES',
+        name: 'SAS-C Series (กระบอกสูบไฮดรอลิก Actuator)',
+        description: 'ซีรี่ส์กระบอกสูบไฮดรอลิกแรงดันสูงสำหรับงานอุตสาหกรรม',
+        createdAt: '2025-01-01',
+      },
+      {
+        id: 'series-sas-02',
+        departmentId: 'SAS',
+        code: 'SAS-R-SERIES',
+        name: 'SAS-R Series (ชุดแดมเปอร์และก้านช็อกอัพ)',
+        description: 'ซีรี่ส์แกนและก้านซับแรงกระแทกความเร็วสูง',
+        createdAt: '2025-01-01',
+      },
+    ],
     models: [
       {
         id: 'mod-sas-01',
         departmentId: 'SAS',
+        seriesId: 'series-sas-01',
+        seriesName: 'SAS-C Series (กระบอกสูบไฮดรอลิก Actuator)',
         code: 'SAS-C50',
         name: 'กระบอกสูบไฮดรอลิก Actuator C50',
         nameEn: 'Hydraulic Cylinder Actuator C50 Series',
@@ -63,6 +83,8 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
       {
         id: 'mod-sas-02',
         departmentId: 'SAS',
+        seriesId: 'series-sas-02',
+        seriesName: 'SAS-R Series (ชุดแดมเปอร์และก้านช็อกอัพ)',
         code: 'SAS-R32',
         name: 'แกนช็อกอัพซับแรงกระแทก Damper R32',
         nameEn: 'Precision Shock Damper Rod R32',
@@ -107,10 +129,30 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
     name: 'แผนก PTS',
     nameEn: 'Power Transmission Systems',
     description: 'ระบบเพลาส่งกำลัง, ชุดขับเคลื่อนเฟือง และหน้าแปลนข้อต่อ',
+    series: [
+      {
+        id: 'series-pts-01',
+        departmentId: 'PTS',
+        code: 'PTS-S-SERIES',
+        name: 'PTS-S Series (เพลาส่งกำลังความเร็วสูง Transmission)',
+        description: 'ซีรี่ส์เพลาขับและเพลาส่งกำลังเครื่องจักรกลหนัก',
+        createdAt: '2025-01-01',
+      },
+      {
+        id: 'series-pts-02',
+        departmentId: 'PTS',
+        code: 'PTS-F-SERIES',
+        name: 'PTS-F Series (หน้าแปลนขับและข้อต่อ Coupling)',
+        description: 'ซีรี่ส์หน้าแปลนข้อต่อความแม่นยำสูง',
+        createdAt: '2025-01-01',
+      },
+    ],
     models: [
       {
         id: 'mod-pts-01',
         departmentId: 'PTS',
+        seriesId: 'series-pts-01',
+        seriesName: 'PTS-S Series (เพลาส่งกำลังความเร็วสูง Transmission)',
         code: 'PTS-S60',
         name: 'เพลาส่งกำลังเกียร์หลัก Drive Shaft S60',
         nameEn: 'Main Transmission Drive Shaft S60 Series',
@@ -160,6 +202,8 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
       {
         id: 'mod-pts-02',
         departmentId: 'PTS',
+        seriesId: 'series-pts-02',
+        seriesName: 'PTS-F Series (หน้าแปลนขับและข้อต่อ Coupling)',
         code: 'PTS-F80',
         name: 'หน้าแปลนขับเชื่อมต่อเพลา Drive Flange F80',
         nameEn: 'Precision Coupling Adapter Flange F80',
@@ -202,10 +246,30 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
     name: 'แผนก OTS',
     nameEn: 'Optical & Tooling Systems',
     description: 'ระบบบล็อกแมนิโฟลด์, ฐานยึดอุปกรณ์ออปติก และทูลลิ่งความละเอียดสูง',
+    series: [
+      {
+        id: 'series-ots-01',
+        departmentId: 'OTS',
+        code: 'OTS-M-SERIES',
+        name: 'OTS-M Series (บล็อกวาล์วไฮดรอลิก Manifold)',
+        description: 'ซีรี่ส์บล็อกควบคุมแรงดันและวาล์วไฮดรอลิกแม่นยำสูง',
+        createdAt: '2025-01-01',
+      },
+      {
+        id: 'series-ots-02',
+        departmentId: 'OTS',
+        code: 'OTS-B-SERIES',
+        name: 'OTS-B Series (ฉากยึดและทูลลิ่งความละเอียดสูง)',
+        description: 'ซีรี่ส์ฉากยึดเซอร์โวมอเตอร์และฐานวางชิ้นงาน',
+        createdAt: '2025-01-01',
+      },
+    ],
     models: [
       {
         id: 'mod-ots-01',
         departmentId: 'OTS',
+        seriesId: 'series-ots-01',
+        seriesName: 'OTS-M Series (บล็อกวาล์วไฮดรอลิก Manifold)',
         code: 'OTS-M40',
         name: 'บล็อกแมนิโฟลด์น้ำมันและฐานออปติก Manifold M40',
         nameEn: 'Electro-Hydraulic Manifold Block M40',
@@ -243,6 +307,8 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
       {
         id: 'mod-ots-02',
         departmentId: 'OTS',
+        seriesId: 'series-ots-02',
+        seriesName: 'OTS-B Series (ฉากยึดและทูลลิ่งความละเอียดสูง)',
         code: 'OTS-B25',
         name: 'ฉากยึดเซนเซอร์และเซอร์โวมอเตอร์ Bracket B25',
         nameEn: 'Servo Motor Precision Mount Bracket B25',

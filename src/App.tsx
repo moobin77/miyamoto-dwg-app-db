@@ -14,6 +14,8 @@ import {
   Shield,
   User,
   SlidersHorizontal,
+  Mail,
+  LogOut,
 } from 'lucide-react';
 import {
   Drawing,
@@ -23,6 +25,8 @@ import {
   DepartmentId,
   DepartmentInfo,
   ProductModel,
+  ProductSeries,
+  UserProfile,
 } from './types';
 import { api } from './services/api';
 import {
@@ -49,6 +53,9 @@ import { ConfirmDeleteModal } from './components/ConfirmDeleteModal';
 import { EditJobModal } from './components/EditJobModal';
 import { EditModelModal } from './components/EditModelModal';
 import { AddDrawingFileModal } from './components/AddDrawingFileModal';
+import { SafeguardDeleteModal, SafeguardDeleteTarget } from './components/SafeguardDeleteModal';
+import { ManageSeriesModal } from './components/ManageSeriesModal';
+import { GmailAuthModal } from './components/GmailAuthModal';
 import { FirebaseSyncBadge } from './components/FirebaseSyncBadge';
 import {
   DATABASE_NAME,
@@ -74,8 +81,32 @@ export default function App() {
   // Admin Modals
   const [isAddModelOpen, setIsAddModelOpen] = useState<boolean>(false);
   const [addModelDeptId, setAddModelDeptId] = useState<DepartmentId>('SAS');
+  const [addModelSeriesId, setAddModelSeriesId] = useState<string | undefined>(undefined);
   const [isAddLengthOpen, setIsAddLengthOpen] = useState<boolean>(false);
   const [selectedModelForLength, setSelectedModelForLength] = useState<ProductModel | null>(null);
+
+  // Series Management
+  const [isManageSeriesOpen, setIsManageSeriesOpen] = useState<boolean>(false);
+
+  // Gmail Authentication
+  const [isGmailAuthOpen, setIsGmailAuthOpen] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<{
+    displayName: string;
+    email: string;
+    photoURL?: string;
+  } | null>(() => {
+    try {
+      const saved = localStorage.getItem('miyamoto_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Safeguard Delete Modal (Requires typing 'ลบ' or 'DELETE' to confirm)
+  const [isSafeguardOpen, setIsSafeguardOpen] = useState<boolean>(false);
+  const [safeguardTarget, setSafeguardTarget] = useState<SafeguardDeleteTarget | null>(null);
+  const [safeguardAction, setSafeguardAction] = useState<(() => Promise<void>) | null>(null);
 
   // Confirm Delete Modal
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -386,9 +417,11 @@ export default function App() {
   };
 
   // Admin: Open Add Model Modal
-  const handleOpenAddModel = (deptId: DepartmentId) => {
+  const handleOpenAddModel = (deptId: DepartmentId, seriesId?: string) => {
     setAddModelDeptId(deptId);
+    setAddModelSeriesId(seriesId);
     setIsAddModelOpen(true);
+    soundEffects.playClick();
   };
 
   // Admin: Submit Add Model
@@ -397,7 +430,7 @@ export default function App() {
     if (res.model) {
       setDepartments((prev) =>
         prev.map((d) =>
-          d.id === deptId ? { ...d, models: [...d.models, res.model!] } : d
+          d.id === deptId ? { ...d, models: [res.model!, ...d.models] } : d
         )
       );
     }
@@ -409,12 +442,14 @@ export default function App() {
       ...s,
       pendingCount: getOfflineQueue().length,
     }));
+    soundEffects.playSuccessChime();
   };
 
   // Admin: Open Add Length Modal
   const handleOpenAddLength = (model: ProductModel) => {
     setSelectedModelForLength(model);
     setIsAddLengthOpen(true);
+    soundEffects.playClick();
   };
 
   // Admin: Submit Add Length
@@ -440,21 +475,152 @@ export default function App() {
       ...s,
       pendingCount: getOfflineQueue().length,
     }));
+    soundEffects.playSuccessChime();
   };
 
-  // Admin: Request Delete Model (Show confirmation dialog)
+  // Admin: Series Management Handlers
+  const handleOpenManageSeries = (deptId: DepartmentId) => {
+    setSelectedDepartmentId(deptId);
+    setIsManageSeriesOpen(true);
+    soundEffects.playClick();
+  };
+
+  const handleAddSeries = async (seriesData: { name: string; code?: string; description?: string }) => {
+    const res = await api.addSeries(selectedDepartmentId, seriesData);
+    if (res.success && res.series) {
+      const created = res.series;
+      setDepartments((prev) =>
+        prev.map((dept) => {
+          if (dept.id === selectedDepartmentId) {
+            return {
+              ...dept,
+              series: [...(dept.series || []), created],
+            };
+          }
+          return dept;
+        })
+      );
+      soundEffects.playSuccessChime();
+    }
+  };
+
+  const handleUpdateSeries = async (
+    seriesId: string,
+    updates: { name?: string; code?: string; description?: string }
+  ) => {
+    const res = await api.updateSeries(seriesId, updates);
+    if (res.success && res.series) {
+      const updated = res.series;
+      setDepartments((prev) =>
+        prev.map((dept) => {
+          if (dept.id === selectedDepartmentId) {
+            return {
+              ...dept,
+              series: (dept.series || []).map((s) => (s.id === seriesId ? updated : s)),
+              models: dept.models.map((m) =>
+                m.seriesId === seriesId ? { ...m, seriesName: updated.name } : m
+              ),
+            };
+          }
+          return dept;
+        })
+      );
+      soundEffects.playClick();
+    }
+  };
+
+  // Safeguard Delete System (Prevents accidental deletion with verification word)
+  const triggerSafeguard = (target: SafeguardDeleteTarget, deleteAction: () => Promise<void>) => {
+    setSafeguardTarget(target);
+    setSafeguardAction(() => deleteAction);
+    setIsSafeguardOpen(true);
+    soundEffects.playClick();
+  };
+
+  const handleConfirmSafeguard = async () => {
+    if (safeguardAction) {
+      await safeguardAction();
+    }
+    setIsSafeguardOpen(false);
+    setSafeguardTarget(null);
+    setSafeguardAction(null);
+  };
+
+  const handleDeleteSeries = (series: ProductSeries) => {
+    const currentDept = departments.find((d) => d.id === selectedDepartmentId);
+    const modelsInSeries = currentDept?.models.filter((m) => m.seriesId === series.id) || [];
+
+    triggerSafeguard(
+      {
+        type: 'SERIES',
+        id: series.id,
+        name: series.name,
+        code: series.code,
+        details: `แผนก: ${selectedDepartmentId} • ${series.description || ''}`,
+        impactCount: modelsInSeries.length,
+        impactDescription: `การลบซีรี่ส์นี้จะทำให้รุ่นทั้ง ${modelsInSeries.length} รุ่น และแบบดรออิ้งที่เกี่ยวข้องถูกนำออกจากระบบ`,
+      },
+      async () => {
+        await api.deleteSeries(series.id);
+        setDepartments((prev) =>
+          prev.map((dept) => {
+            if (dept.id === selectedDepartmentId) {
+              return {
+                ...dept,
+                series: dept.series?.filter((s) => s.id !== series.id) || [],
+                models: dept.models.filter((m) => m.seriesId !== series.id),
+              };
+            }
+            return dept;
+          })
+        );
+        setSyncStatus((s) => ({
+          ...s,
+          pendingCount: getOfflineQueue().length,
+        }));
+        soundEffects.playClick();
+      }
+    );
+  };
+
+  // Admin: Request Delete Model with Safeguard
   const handleRequestDeleteModel = (modelId: string, modelCode: string) => {
-    setDeleteConfirm({
-      isOpen: true,
-      type: 'MODEL',
-      modelId,
-      modelCode,
-      title: `ยืนยันการลบรุ่น "${modelCode}"`,
-      message:
-        'คุณแน่ใจหรือไม่ว่าต้องการลบรุ่นที่ผลิตนี้? แบบดรออิ้งและขนาดความยาวทั้งหมดภายใต้รุ่นนี้จะถูกลบออกจากระบบการผลิตด้วย',
-      itemDetail: `รหัสรุ่น: ${modelCode}`,
-      isDeleting: false,
-    });
+    const currentDept = departments.find((d) => d.id === selectedDepartmentId);
+    const model = currentDept?.models.find((m) => m.id === modelId);
+    const impactCount = model?.lengths.length || 0;
+
+    triggerSafeguard(
+      {
+        type: 'MODEL',
+        id: modelId,
+        name: model?.name || modelCode,
+        code: modelCode,
+        details: `แผนก: ${selectedDepartmentId} • ${model?.category || ''}`,
+        impactCount,
+        impactDescription: `การลบรุ่นนี้จะนำแบบดรออิ้งและขนาดความยาวทั้ง ${impactCount} รายการ ออกจากระบบ`,
+      },
+      async () => {
+        await api.deleteModel(modelId);
+        setDepartments((prev) =>
+          prev.map((dept) => ({
+            ...dept,
+            models: dept.models.filter((m) => m.id !== modelId),
+          }))
+        );
+        setDrawings((prev) => prev.filter((d) => d.modelId !== modelId));
+        setSyncStatus((s) => ({
+          ...s,
+          pendingCount: getOfflineQueue().length,
+        }));
+        soundEffects.playClick();
+      }
+    );
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem('miyamoto_current_user');
+    soundEffects.playClick();
   };
 
   // Admin: Request Delete Length (Show confirmation dialog)
@@ -722,6 +888,9 @@ export default function App() {
     )
   );
 
+  const currentDepartment =
+    departments.find((d) => d.id === selectedDepartmentId) || departments[0];
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
       {/* GLOBAL APPLICATION HEADER */}
@@ -760,8 +929,56 @@ export default function App() {
           </div>
         </div>
 
-        {/* Right: Admin Mode Toggle, Offline Sync Badge & Notifications */}
+        {/* Right: Gmail Auth, Admin Mode Toggle, Offline Sync Badge & Notifications */}
         <div className="flex items-center gap-2 sm:gap-2.5">
+          {/* Gmail / Google Login & User Status */}
+          {currentUser ? (
+            <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/90 px-2 py-1 rounded-xl shadow-inner">
+              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0 border border-white/20">
+                {currentUser.photoURL ? (
+                  <img
+                    src={currentUser.photoURL}
+                    alt={currentUser.displayName}
+                    className="w-full h-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  currentUser.displayName.charAt(0).toUpperCase()
+                )}
+              </div>
+              <div className="hidden lg:block text-left min-w-0 max-w-[130px]">
+                <div className="text-[11px] font-semibold text-white truncate leading-tight">
+                  {currentUser.displayName}
+                </div>
+                <div className="text-[9px] text-blue-300 truncate leading-tight">
+                  {currentUser.email}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                title="ออกจากระบบ (Sign Out)"
+                className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition ml-0.5"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              id="login-gmail-btn"
+              type="button"
+              onClick={() => {
+                setIsGmailAuthOpen(true);
+                soundEffects.playClick();
+              }}
+              className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 transition flex items-center gap-1.5 shadow-sm"
+              title="เข้าสู่ระบบด้วย Gmail หรือ Google Account"
+            >
+              <Mail className="w-3.5 h-3.5 text-blue-400" />
+              <span className="hidden sm:inline">เข้าสู่ระบบ Gmail</span>
+            </button>
+          )}
+
           {/* Admin Mode Toggle Pill for Easy Testing */}
           <button
             id="toggle-admin-mode-btn"
@@ -851,6 +1068,10 @@ export default function App() {
             onOpenEditModel={handleOpenEditModel}
             onOpenAddFile={handleOpenAddFile}
             onOpenAddFileGuide={() => handleOpenAddFile()}
+            onOpenManageSeries={handleOpenManageSeries}
+            onOpenAddSeries={handleOpenManageSeries}
+            onOpenEditSeries={() => setIsManageSeriesOpen(true)}
+            onDeleteSeries={handleDeleteSeries}
             operatorName={settings.operatorName}
             stationLine={settings.stationLine}
             machineId={settings.machineId}
@@ -893,9 +1114,56 @@ export default function App() {
       {/* 1. Add Model Modal (Admin) */}
       <AddModelModal
         isOpen={isAddModelOpen}
-        onClose={() => setIsAddModelOpen(false)}
+        onClose={() => {
+          setIsAddModelOpen(false);
+          setAddModelSeriesId(undefined);
+        }}
         defaultDepartmentId={addModelDeptId}
+        defaultSeriesId={addModelSeriesId}
+        seriesList={currentDepartment?.series || []}
         onSubmit={handleSubmitAddModel}
+      />
+
+      {/* 1.1 Manage Series Modal (Admin) */}
+      {isManageSeriesOpen && currentDepartment && (
+        <ManageSeriesModal
+          isOpen={isManageSeriesOpen}
+          department={currentDepartment}
+          onClose={() => setIsManageSeriesOpen(false)}
+          onAddSeries={handleAddSeries}
+          onUpdateSeries={handleUpdateSeries}
+          onTriggerDeleteSafeguard={triggerSafeguard}
+          onOpenAddModelForSeries={(seriesId) => {
+            setIsManageSeriesOpen(false);
+            handleOpenAddModel(selectedDepartmentId, seriesId);
+          }}
+        />
+      )}
+
+      {/* 1.2 Safeguard Delete Confirmation Modal (Requires typing 'ลบ' or 'DELETE' to confirm) */}
+      <SafeguardDeleteModal
+        isOpen={isSafeguardOpen}
+        target={safeguardTarget}
+        onConfirm={handleConfirmSafeguard}
+        onClose={() => {
+          setIsSafeguardOpen(false);
+          setSafeguardTarget(null);
+          setSafeguardAction(null);
+        }}
+      />
+
+      {/* 1.3 Gmail / Google Account Sign In Modal */}
+      <GmailAuthModal
+        isOpen={isGmailAuthOpen}
+        onClose={() => setIsGmailAuthOpen(false)}
+        onSuccess={(user) => {
+          setCurrentUser(user);
+          localStorage.setItem('miyamoto_current_user', JSON.stringify(user));
+          if (user.role === 'ADMIN') {
+            setIsAdmin(true);
+          }
+          soundEffects.playSuccessChime();
+        }}
       />
 
       {/* 2. Add Length Modal (Admin) */}

@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
-import { X, Plus, Layers, Box, Cpu, AlertCircle } from 'lucide-react';
-import { DepartmentId, ProductModel } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X, Plus, Layers, Box, Cpu, AlertCircle, FolderTree } from 'lucide-react';
+import { DepartmentId, ProductModel, ProductSeries } from '../types';
 
 interface AddModelModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultDepartmentId?: DepartmentId;
+  defaultSeriesId?: string;
+  seriesList?: ProductSeries[];
   onSubmit: (departmentId: DepartmentId, modelData: {
+    seriesId?: string;
     code: string;
     name: string;
     nameEn?: string;
@@ -22,9 +25,12 @@ export const AddModelModal: React.FC<AddModelModalProps> = ({
   isOpen,
   onClose,
   defaultDepartmentId = 'SAS',
+  defaultSeriesId,
+  seriesList = [],
   onSubmit,
 }) => {
   const [departmentId, setDepartmentId] = useState<DepartmentId>(defaultDepartmentId);
+  const [seriesId, setSeriesId] = useState<string>(defaultSeriesId || '');
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [nameEn, setNameEn] = useState('');
@@ -36,7 +42,21 @@ export const AddModelModal: React.FC<AddModelModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Update seriesId if defaultSeriesId or departmentId changes
+  useEffect(() => {
+    if (defaultSeriesId) {
+      setSeriesId(defaultSeriesId);
+    } else {
+      const deptsSeries = seriesList.filter((s) => s.departmentId === departmentId);
+      if (deptsSeries.length > 0) {
+        setSeriesId(deptsSeries[0].id);
+      }
+    }
+  }, [defaultSeriesId, departmentId, seriesList]);
+
   if (!isOpen) return null;
+
+  const relevantSeries = seriesList.filter((s) => s.departmentId === departmentId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +77,7 @@ export const AddModelModal: React.FC<AddModelModalProps> = ({
       setIsSubmitting(true);
       setError('');
       await onSubmit(departmentId, {
+        seriesId: seriesId || undefined,
         code: code.trim().toUpperCase(),
         name: name.trim(),
         nameEn: nameEn.trim() || undefined,
@@ -145,6 +166,32 @@ export const AddModelModal: React.FC<AddModelModalProps> = ({
                 );
               })}
             </div>
+          </div>
+
+          {/* Series Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <FolderTree className="w-3.5 h-3.5 text-indigo-400" />
+              <span>เลือกซีรี่ส์ที่ต้องการบรรจุรุ่นนี้ (Product Series)</span>
+            </label>
+            {relevantSeries.length > 0 ? (
+              <select
+                value={seriesId}
+                onChange={(e) => setSeriesId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">-- ไม่ระบุซีรี่ส์ (รุ่นทั่วไป) --</option>
+                {relevantSeries.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    📁 {s.code} - {s.name} ({s.modelsCount || 0} รุ่น)
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="text-xs text-slate-400 bg-slate-800/60 p-2.5 rounded-xl border border-slate-700/60">
+                ยังไม่มีซีรี่ส์ในแผนกนี้ ระบบจะสร้างรุ่นเป็นรุ่นทั่วไป หรือคุณสามารถเพิ่มซีรี่ส์ใหม่ได้ที่เมนู "จัดการซีรี่ส์"
+              </div>
+            )}
           </div>
 
           {/* Model Code and Name */}

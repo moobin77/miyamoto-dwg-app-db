@@ -56,6 +56,15 @@ export interface AnnotationItem {
 
 export type DepartmentId = 'SAS' | 'PTS' | 'OTS';
 
+export interface ProductSeries {
+  id: string;
+  departmentId: DepartmentId;
+  code: string; // e.g. "SAS-C", "PTS-S", "OTS-M"
+  name: string; // e.g. "SAS-C Series (กระบอกสูบไฮดรอลิกคอมแพ็ค)"
+  description?: string;
+  createdAt: string;
+}
+
 export interface ModelLengthVariant {
   id: string;
   modelId: string;
@@ -73,6 +82,8 @@ export interface ModelLengthVariant {
 export interface ProductModel {
   id: string;
   departmentId: DepartmentId;
+  seriesId?: string; // e.g. "series-sas-01"
+  seriesName?: string;
   code: string; // e.g. "SAS-C50", "PTS-S60", "OTS-M40"
   name: string; // e.g. "กระบอกสูบไฮดรอลิก Actuator C50"
   nameEn: string;
@@ -89,7 +100,18 @@ export interface DepartmentInfo {
   name: string;
   nameEn: string;
   description: string;
+  series?: ProductSeries[];
   models: ProductModel[];
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  photoURL?: string;
+  role: 'ADMIN' | 'ENGINEER' | 'OPERATOR';
+  department?: DepartmentId;
+  loggedInAt?: string;
 }
 
 export interface AttachedDrawingFile {

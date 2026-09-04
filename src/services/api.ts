@@ -5,6 +5,7 @@ import {
   OperatorAcknowledgment,
   DepartmentId,
   DepartmentInfo,
+  ProductSeries,
   ProductModel,
   ModelLengthVariant,
   AttachedDrawingFile,
@@ -184,10 +185,175 @@ class ApiService {
     }
   }
 
+  // Admin: Add a new Series (ซีรี่ส์) to a department
+  async addSeries(
+    departmentId: DepartmentId,
+    seriesData: {
+      code?: string;
+      name: string;
+      description?: string;
+    }
+  ): Promise<{ success: boolean; series?: ProductSeries; offlineQueued?: boolean }> {
+    const isOnline = this.isEffectivelyOnline();
+    const seriesId = `series-${departmentId.toLowerCase()}-${Date.now().toString(36)}`;
+    const seriesCode = seriesData.code?.trim()
+      ? seriesData.code.trim().toUpperCase()
+      : `${departmentId}-${Date.now().toString(36).substring(0, 4).toUpperCase()}`;
+
+    const localSeries: ProductSeries = {
+      id: seriesId,
+      departmentId,
+      code: seriesCode,
+      name: seriesData.name.trim(),
+      description: seriesData.description?.trim() || '',
+      createdAt: new Date().toISOString().substring(0, 10),
+    };
+
+    // Update local cache optimistically
+    const depts = getLocalDepartments();
+    const d = depts.find((dept) => dept.id === departmentId);
+    if (d) {
+      if (!d.series) d.series = [];
+      d.series.push(localSeries);
+      saveLocalDepartments(depts);
+      saveDepartmentToFirestore(d).catch(console.warn);
+    }
+
+    if (!isOnline) {
+      addToOfflineQueue({
+        action: 'ADD_SERIES' as any,
+        payload: { departmentId, series: localSeries },
+      });
+      return { success: true, series: localSeries, offlineQueued: true };
+    }
+
+    try {
+      const res = await fetch('/api/series', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ departmentId, ...seriesData }),
+      });
+      if (!res.ok) throw new Error('Failed to create series');
+      const data = await res.json();
+      return data;
+    } catch {
+      return { success: true, series: localSeries, offlineQueued: true };
+    }
+  }
+
+  // Admin: Edit / Rename a Series (แก้ไขชื่อซีรี่ส์)
+  async updateSeries(
+    seriesId: string,
+    updates: {
+      name?: string;
+      code?: string;
+      description?: string;
+    }
+  ): Promise<{ success: boolean; series?: ProductSeries; offlineQueued?: boolean }> {
+    const isOnline = this.isEffectivelyOnline();
+
+    // Optimistically update local departments
+    const depts = getLocalDepartments();
+    let updatedSeries: ProductSeries | null = null;
+    let targetDept: DepartmentInfo | null = null;
+
+    for (const d of depts) {
+      const s = d.series?.find((item) => item.id === seriesId);
+      if (s) {
+        if (updates.name) s.name = updates.name.trim();
+        if (updates.code) s.code = updates.code.trim().toUpperCase();
+        if (updates.description !== undefined) s.description = updates.description.trim();
+        updatedSeries = s;
+        targetDept = d;
+        // Also update model seriesName
+        d.models.forEach((m) => {
+          if (m.seriesId === seriesId) {
+            m.seriesName = s.name;
+          }
+        });
+        break;
+      }
+    }
+
+    if (targetDept) {
+      saveLocalDepartments(depts);
+      saveDepartmentToFirestore(targetDept).catch(console.warn);
+    }
+
+    if (!isOnline) {
+      return { success: true, series: updatedSeries || undefined, offlineQueued: true };
+    }
+
+    try {
+      const res = await fetch(`/api/series/${seriesId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Failed to update series');
+      const data = await res.json();
+      return data;
+    } catch {
+      return { success: true, series: updatedSeries || undefined, offlineQueued: true };
+    }
+  }
+
+  // Admin: Delete a Series with safeguard
+  async deleteSeries(
+    seriesId: string
+  ): Promise<{ success: boolean; offlineQueued?: boolean }> {
+    const isOnline = this.isEffectivelyOnline();
+
+    // Optimistically remove from local cache
+    const depts = getLocalDepartments();
+    let targetDept: DepartmentInfo | null = null;
+
+    for (const d of depts) {
+      const idx = d.series?.findIndex((s) => s.id === seriesId) ?? -1;
+      if (idx !== -1 && d.series) {
+        d.series.splice(idx, 1);
+        targetDept = d;
+        // Remove or un-assign models
+        const modelsToRemove = d.models.filter((m) => m.seriesId === seriesId);
+        d.models = d.models.filter((m) => m.seriesId !== seriesId);
+
+        // Remove drawings
+        let localDwgs = getLocalDrawings();
+        modelsToRemove.forEach((m) => {
+          m.lengths.forEach((l) => {
+            localDwgs = localDwgs.filter((dwg) => dwg.id !== l.drawingId);
+          });
+        });
+        saveLocalDrawings(localDwgs);
+        break;
+      }
+    }
+
+    if (targetDept) {
+      saveLocalDepartments(depts);
+      saveDepartmentToFirestore(targetDept).catch(console.warn);
+    }
+
+    if (!isOnline) {
+      return { success: true, offlineQueued: true };
+    }
+
+    try {
+      const res = await fetch(`/api/series/${seriesId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete series');
+      return { success: true };
+    } catch {
+      return { success: true, offlineQueued: true };
+    }
+  }
+
   // Admin: Add a new model to department (SAS / PTS / OTS)
   async addModel(
     departmentId: DepartmentId,
     modelData: {
+      seriesId?: string;
       code: string;
       name: string;
       nameEn?: string;
@@ -213,9 +379,16 @@ class ApiService {
     const lengthId = `len-${modelId}-${initialLengthMm}`;
     const drawingId = `dwg-${modelData.code.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${initialLengthMm}`;
 
+    // Get series name if provided
+    const depts = getLocalDepartments();
+    const d = depts.find((dept) => dept.id === departmentId);
+    const chosenSeries = d?.series?.find((s) => s.id === modelData.seriesId) || d?.series?.[0] || null;
+
     const localModel: ProductModel = {
       id: modelId,
       departmentId,
+      seriesId: chosenSeries ? chosenSeries.id : undefined,
+      seriesName: chosenSeries ? chosenSeries.name : undefined,
       code: modelData.code,
       name: modelData.name,
       nameEn: modelData.nameEn || modelData.name,
@@ -241,8 +414,6 @@ class ApiService {
     };
 
     // Update local cache optimistically
-    const depts = getLocalDepartments();
-    const d = depts.find((dept) => dept.id === departmentId);
     if (d) {
       d.models.unshift(localModel);
       saveLocalDepartments(depts);

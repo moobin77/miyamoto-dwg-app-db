@@ -12,6 +12,7 @@ import {
   OperatorAcknowledgment,
   DepartmentId,
   DepartmentInfo,
+  ProductSeries,
   ProductModel,
   ModelLengthVariant,
   AttachedDrawingFile,
@@ -193,15 +194,126 @@ app.get('/api/events', (req: Request, res: Response) => {
   });
 });
 
-// 3. Departments, Models, and Length Variants Endpoints
+// 3. Departments, Series, Models, and Length Variants Endpoints
 app.get('/api/departments', (req: Request, res: Response) => {
   res.json(departments);
 });
 
-// Admin adds a new model to SAS / PTS / OTS
+// Admin creates a new Series (ซีรี่ส์) in a department
+app.post('/api/series', (req: Request, res: Response) => {
+  const { departmentId, code, name, description } = req.body;
+  if (!departmentId || !name) {
+    return res.status(400).json({ error: 'departmentId and name are required' });
+  }
+
+  const dept = departments.find((d) => d.id === departmentId);
+  if (!dept) {
+    return res.status(404).json({ error: `Department ${departmentId} not found` });
+  }
+
+  if (!dept.series) dept.series = [];
+
+  const seriesId = `series-${departmentId.toLowerCase()}-${Date.now().toString(36)}`;
+  const seriesCode = code && code.trim()
+    ? code.trim().toUpperCase()
+    : `${departmentId}-${Date.now().toString(36).substring(0, 4).toUpperCase()}`;
+
+  const newSeries: ProductSeries = {
+    id: seriesId,
+    departmentId,
+    code: seriesCode,
+    name: name.trim(),
+    description: description ? description.trim() : '',
+    createdAt: new Date().toISOString().substring(0, 10),
+  };
+
+  dept.series.push(newSeries);
+
+  broadcast('series_added', { departmentId, series: newSeries });
+  broadcast('departments_updated', departments);
+
+  res.status(201).json({ success: true, series: newSeries, departments });
+});
+
+// Admin edits/renames a Series (แก้ไขชื่อซีรี่ส์)
+app.patch('/api/series/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { name, code, description } = req.body;
+
+  let foundSeries: ProductSeries | null = null;
+  let foundDept: DepartmentInfo | null = null;
+
+  for (const dept of departments) {
+    const s = dept.series?.find((item) => item.id === id);
+    if (s) {
+      foundSeries = s;
+      foundDept = dept;
+      break;
+    }
+  }
+
+  if (!foundSeries || !foundDept) {
+    return res.status(404).json({ error: 'Series not found' });
+  }
+
+  if (name !== undefined && name.trim()) foundSeries.name = name.trim();
+  if (code !== undefined && code.trim()) foundSeries.code = code.trim().toUpperCase();
+  if (description !== undefined) foundSeries.description = description.trim();
+
+  // Update seriesName on any models belonging to this series
+  foundDept.models.forEach((m) => {
+    if (m.seriesId === id) {
+      m.seriesName = foundSeries!.name;
+    }
+  });
+
+  broadcast('series_updated', { series: foundSeries, departmentId: foundDept.id });
+  broadcast('departments_updated', departments);
+
+  res.json({ success: true, series: foundSeries, departments });
+});
+
+// Admin deletes a Series with safeguard cascade
+app.delete('/api/series/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  let targetDept: DepartmentInfo | null = null;
+  let deletedSeries: ProductSeries | null = null;
+
+  for (const dept of departments) {
+    const idx = dept.series?.findIndex((s) => s.id === id) ?? -1;
+    if (idx !== -1 && dept.series) {
+      targetDept = dept;
+      deletedSeries = dept.series[idx];
+      dept.series.splice(idx, 1);
+
+      // Also remove associated models & drawings
+      const modelsToDelete = dept.models.filter((m) => m.seriesId === id);
+      dept.models = dept.models.filter((m) => m.seriesId !== id);
+      modelsToDelete.forEach((m) => {
+        m.lengths.forEach((l) => {
+          drawings = drawings.filter((d) => d.id !== l.drawingId);
+        });
+      });
+      break;
+    }
+  }
+
+  if (!deletedSeries || !targetDept) {
+    return res.status(404).json({ error: 'Series not found' });
+  }
+
+  broadcast('series_deleted', { seriesId: id, departmentId: targetDept.id });
+  broadcast('departments_updated', departments);
+  broadcast('drawings_updated', drawings);
+
+  res.json({ success: true, seriesId: id, departments, drawings });
+});
+
+// Admin adds a new model to SAS / PTS / OTS (can belong to a Series)
 app.post('/api/models', (req: Request, res: Response) => {
   const {
     departmentId,
+    seriesId,
     code,
     name,
     nameEn = '',
@@ -220,6 +332,9 @@ app.post('/api/models', (req: Request, res: Response) => {
   if (!dept) {
     return res.status(404).json({ error: `Department ${departmentId} not found` });
   }
+
+  // Resolve series info
+  const chosenSeries = dept.series?.find((s) => s.id === seriesId) || dept.series?.[0] || null;
 
   const modelId = `mod-${departmentId.toLowerCase()}-${Date.now().toString(36)}`;
   const lengthId = `len-${modelId}-${initialLengthMm}`;
@@ -244,6 +359,8 @@ app.post('/api/models', (req: Request, res: Response) => {
   const newModel: ProductModel = {
     id: modelId,
     departmentId,
+    seriesId: chosenSeries ? chosenSeries.id : undefined,
+    seriesName: chosenSeries ? chosenSeries.name : undefined,
     code,
     name,
     nameEn: nameEn || name,
@@ -301,7 +418,7 @@ app.post('/api/models', (req: Request, res: Response) => {
 // Admin updates a model header (code, name, nameEn, category, description, svgType)
 app.patch('/api/models/:modelId', (req: Request, res: Response) => {
   const { modelId } = req.params;
-  const { code, name, nameEn, category, description, svgType } = req.body;
+  const { code, name, nameEn, category, description, svgType, seriesId } = req.body;
 
   let foundModel: ProductModel | null = null;
   let foundDept: DepartmentInfo | null = null;
@@ -326,6 +443,11 @@ app.patch('/api/models/:modelId', (req: Request, res: Response) => {
   if (category !== undefined && category.trim()) foundModel.category = category.trim();
   if (description !== undefined) foundModel.description = description.trim();
   if (svgType !== undefined) foundModel.svgType = svgType;
+  if (seriesId !== undefined) {
+    foundModel.seriesId = seriesId;
+    const s = foundDept.series?.find((x) => x.id === seriesId);
+    foundModel.seriesName = s ? s.name : undefined;
+  }
 
   // Sync to all drawings belonging to this model
   for (const len of foundModel.lengths) {

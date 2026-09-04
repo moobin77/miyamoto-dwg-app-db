@@ -1,5 +1,16 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
+  getAuth,
+  initializeAuth,
+  browserLocalPersistence,
+  signInWithPopup,
+  GoogleAuthProvider,
+  signOut as firebaseSignOut,
+  onAuthStateChanged,
+  User as FirebaseUser,
+  Auth,
+} from 'firebase/auth';
+import {
   getFirestore,
   initializeFirestore,
   Firestore,
@@ -20,6 +31,7 @@ import {
   Drawing,
   NotificationAlert,
   OperatorAcknowledgment,
+  UserProfile,
 } from '../types';
 
 // Ensure config object is valid
@@ -37,12 +49,147 @@ export const DATABASE_NAME = firebaseConfig.firestoreDatabaseId || 'miyamoto-dwg
 
 let appInstance: ReturnType<typeof initializeApp> | null = null;
 let dbInstance: Firestore | null = null;
+let authInstance: Auth | null = null;
 
 export function getFirebaseApp() {
   if (!appInstance) {
     appInstance = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   }
   return appInstance;
+}
+
+export function getFirebaseAuth(): Auth {
+  if (!authInstance) {
+    const app = getFirebaseApp();
+    try {
+      authInstance = initializeAuth(app, {
+        persistence: browserLocalPersistence,
+      });
+    } catch {
+      authInstance = getAuth(app);
+    }
+  }
+  return authInstance;
+}
+
+// Local Storage Key for persistent operator session
+const AUTH_USER_STORAGE_KEY = 'miyamoto_dwg_auth_user';
+
+export function getStoredAuthUser(): UserProfile | null {
+  try {
+    const saved = localStorage.getItem(AUTH_USER_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAuthUser(user: UserProfile | null) {
+  try {
+    if (user) {
+      localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+}
+
+// 0. Gmail / Google Authentication Services
+export async function signInWithGoogle(): Promise<{
+  success: boolean;
+  user?: UserProfile;
+  error?: string;
+}> {
+  try {
+    const auth = getFirebaseAuth();
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    const result = await signInWithPopup(auth, provider);
+    const fbUser = result.user;
+
+    const profile: UserProfile = {
+      uid: fbUser.uid,
+      email: fbUser.email || '',
+      displayName: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'ผู้ใช้งาน'),
+      photoURL: fbUser.photoURL || undefined,
+      role: 'ADMIN', // Default to Admin when signing in with authorized Google account
+      department: 'SAS',
+      loggedInAt: new Date().toISOString(),
+    };
+
+    setStoredAuthUser(profile);
+    return { success: true, user: profile };
+  } catch (error: any) {
+    console.warn('Google Auth Popup notice:', error);
+    // If popup is blocked by browser/iframe security, report gracefully
+    return {
+      success: false,
+      error: error?.code === 'auth/popup-blocked'
+        ? 'บราวเซอร์บล็อกหน้าต่างป็อปอัป กรุณาอนุญาตป็อปอัป หรือใช้วิธีระบุอีเมล Gmail ด้านล่าง'
+        : error?.message || 'ไม่สามารถเชื่อมต่อ Google Sign-in ได้',
+    };
+  }
+}
+
+export async function signInWithDirectGmail(
+  email: string,
+  displayName?: string,
+  role: 'ADMIN' | 'ENGINEER' | 'OPERATOR' = 'ADMIN'
+): Promise<UserProfile> {
+  const cleanEmail = email.trim().toLowerCase();
+  const name = displayName?.trim() || cleanEmail.split('@')[0];
+  const profile: UserProfile = {
+    uid: `user-${Date.now().toString(36)}`,
+    email: cleanEmail,
+    displayName: name,
+    photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0284c7&color=fff&bold=true`,
+    role,
+    department: 'SAS',
+    loggedInAt: new Date().toISOString(),
+  };
+  setStoredAuthUser(profile);
+  return profile;
+}
+
+export async function signOutUser(): Promise<void> {
+  try {
+    const auth = getFirebaseAuth();
+    await firebaseSignOut(auth);
+  } catch {
+    // Ignore signout network error
+  }
+  setStoredAuthUser(null);
+}
+
+export function subscribeToFirebaseAuthState(callback: (user: UserProfile | null) => void): Unsubscribe {
+  try {
+    const auth = getFirebaseAuth();
+    return onAuthStateChanged(auth, (fbUser: FirebaseUser | null) => {
+      if (fbUser) {
+        const profile: UserProfile = {
+          uid: fbUser.uid,
+          email: fbUser.email || '',
+          displayName: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'ผู้ใช้งาน'),
+          photoURL: fbUser.photoURL || undefined,
+          role: 'ADMIN',
+          department: 'SAS',
+          loggedInAt: new Date().toISOString(),
+        };
+        setStoredAuthUser(profile);
+        callback(profile);
+      } else {
+        const stored = getStoredAuthUser();
+        callback(stored);
+      }
+    });
+  } catch {
+    const stored = getStoredAuthUser();
+    callback(stored);
+    return () => {};
+  }
 }
 
 export function getFirebaseDb(): Firestore {

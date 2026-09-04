@@ -24,6 +24,7 @@ import {
   Eye,
   FileCode,
   File,
+  FileText,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Drawing, DrawingVersion, CriticalDimension, AttachedDrawingFile } from '../types';
@@ -86,13 +87,33 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
   // Measurement input state for selected critical dimension
   const [inputMeasurement, setInputMeasurement] = useState('');
 
+  // Track attached files count to automatically show newly uploaded file on screen!
+  const prevFilesCountRef = useRef(drawing.attachedFiles?.length || 0);
+
+  useEffect(() => {
+    const currentCount = drawing.attachedFiles?.length || 0;
+    // When a new file is uploaded/added, auto-switch to display it on screen!
+    if (currentCount > prevFilesCountRef.current && drawing.attachedFiles && drawing.attachedFiles.length > 0) {
+      setActiveViewFile(drawing.attachedFiles[0]);
+    }
+    prevFilesCountRef.current = currentCount;
+  }, [drawing.attachedFiles]);
+
   // Reset view when drawing or version changes
   useEffect(() => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
     setSelectedDimId(null);
-    // If drawing has attached files, keep or reset file view
-    if (!drawing.attachedFiles || drawing.attachedFiles.length === 0) {
+    // If drawing has attached files, auto select the first one if not already set
+    if (drawing.attachedFiles && drawing.attachedFiles.length > 0) {
+      // Keep active view file or set to latest file
+      setActiveViewFile((prev) => {
+        if (prev && drawing.attachedFiles?.some((f) => f.id === prev.id)) {
+          return prev;
+        }
+        return drawing.attachedFiles![0];
+      });
+    } else {
       setActiveViewFile(null);
     }
   }, [drawing.id, activeVersion.version]);
@@ -524,6 +545,75 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
         </div>
       </div>
 
+      {/* 2.5 ATTACHED FILES QUICK-SWITCH BAR */}
+      {drawing.attachedFiles && drawing.attachedFiles.length > 0 && (
+        <div className="px-4 py-2 bg-slate-950 border-b border-indigo-500/30 flex items-center justify-between gap-3 overflow-x-auto shadow-inner">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5 shrink-0">
+              <Paperclip className="w-3.5 h-3.5 text-indigo-400" />
+              <span>ไฟล์ในแบบนี้ ({drawing.attachedFiles.length}):</span>
+            </span>
+
+            {/* Tab: CAD Vector Blueprint */}
+            <button
+              type="button"
+              onClick={() => setActiveViewFile(null)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 border ${
+                !activeViewFile
+                  ? 'bg-blue-600 border-blue-400 text-white shadow-md shadow-blue-600/30 ring-1 ring-blue-400'
+                  : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-blue-300" />
+              <span>📐 แบบร่าง CAD (Vector)</span>
+            </button>
+
+            {/* Tabs for Attached Files */}
+            {drawing.attachedFiles.map((file, idx) => {
+              const isSelected = activeViewFile?.id === file.id;
+              return (
+                <button
+                  key={file.id}
+                  type="button"
+                  onClick={() => setActiveViewFile(file)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shrink-0 border ${
+                    isSelected
+                      ? 'bg-amber-500 border-amber-400 text-slate-950 shadow-md shadow-amber-500/30 ring-1 ring-amber-400'
+                      : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+                  }`}
+                >
+                  <Eye className={`w-3.5 h-3.5 ${isSelected ? 'text-slate-950' : 'text-amber-400'}`} />
+                  <span className="truncate max-w-[170px]">{file.fileName}</span>
+                  <span
+                    className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold ${
+                      isSelected ? 'bg-slate-950/20 text-slate-950' : 'bg-slate-800 text-slate-300'
+                    }`}
+                  >
+                    {file.fileType}
+                  </span>
+                  {idx === 0 && (
+                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-500 text-white font-black animate-pulse">
+                      ล่าสุด
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {isAdmin && onOpenAddFile && (
+            <button
+              type="button"
+              onClick={onOpenAddFile}
+              className="px-2.5 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-semibold shrink-0 flex items-center gap-1.5 transition"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>+ แนบไฟล์เพิ่ม</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 3. MAIN WORKSPACE: VECTOR DRAWING VIEWPORT + INSPECTION DRAWER */}
       <div className="flex-1 relative flex overflow-hidden">
         {/* Drawing Pan & Zoom Stage */}
@@ -604,11 +694,31 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                   (activeViewFile.dataUrl && activeViewFile.dataUrl.startsWith('data:application/pdf')) ||
                   (activeViewFile.fileUrl && (activeViewFile.fileUrl.includes('drive.google.com') || activeViewFile.fileUrl.toLowerCase().includes('.pdf') || activeViewFile.fileUrl.startsWith('/api/files/'))) ? (
                   <div className="w-[85vw] max-w-4xl h-[70vh] rounded-xl border border-slate-800 bg-slate-950 overflow-hidden flex flex-col">
-                    <iframe
-                      src={activeViewFile.dataUrl || activeViewFile.fileUrl}
-                      title={activeViewFile.fileName}
-                      className="w-full flex-1 border-0 rounded-b-xl"
-                    />
+                    <div className="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between text-xs text-slate-300">
+                      <div className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                        <FileText className="w-3.5 h-3.5" />
+                        <span>แสดงเอกสารแบบแปลน PDF</span>
+                      </div>
+                      <a
+                        href={activeViewFile.dataUrl || activeViewFile.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[11px] flex items-center gap-1 transition shadow-sm"
+                      >
+                        <ExternalLink className="w-3 h-3" /> เปิดดูในแท็บใหม่ / เต็มจอ
+                      </a>
+                    </div>
+                    <object
+                      data={activeViewFile.dataUrl || activeViewFile.fileUrl}
+                      type="application/pdf"
+                      className="w-full flex-1 border-0"
+                    >
+                      <iframe
+                        src={activeViewFile.dataUrl || activeViewFile.fileUrl}
+                        title={activeViewFile.fileName}
+                        className="w-full h-full border-0"
+                      />
+                    </object>
                   </div>
                 ) : (
                   <div className="p-8 text-center space-y-4 max-w-md my-6">
