@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Miyamoto Drawing Management Firestore Blueprint",
+  "description": "Database schema and security specification for miyamoto-dwg-app-db",
+  "databaseId": "miyamoto-dwg-app-db",
+  "entities": {
+    "departments": {
+      "collection": "departments",
+      "description": "Production departments (SAS, PTS, OTS) and their product models",
+      "documentId": "departmentId",
+      "fields": {
+        "id": { "type": "string", "description": "Department ID (SAS, PTS, OTS)" },
+        "name": { "type": "string", "description": "Thai department name" },
+        "nameEn": { "type": "string", "description": "English department name" },
+        "code": { "type": "string", "description": "Department code" },
+        "description": { "type": "string", "description": "Department description" },
+        "models": { "type": "array", "description": "List of product models under this department" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      }
+    },
+    "drawings": {
+      "collection": "drawings",
+      "description": "Technical engineering drawings, revisions, and CAD files",
+      "documentId": "drawingId",
+      "fields": {
+        "id": { "type": "string", "description": "Drawing ID" },
+        "code": { "type": "string", "description": "Drawing number code (e.g. DWG-FLG-2024-001)" },
+        "title": { "type": "string", "description": "Drawing title in Thai" },
+        "titleEn": { "type": "string", "description": "Drawing title in English" },
+        "modelId": { "type": "string", "description": "Parent model ID" },
+        "modelCode": { "type": "string", "description": "Parent model code" },
+        "modelName": { "type": "string", "description": "Parent model name" },
+        "partNumber": { "type": "string", "description": "Part Number" },
+        "category": { "type": "string", "description": "Component category" },
+        "lengthMm": { "type": "number", "description": "Length in millimeters" },
+        "lengthLabel": { "type": "string", "description": "Length display label" },
+        "machineNo": { "type": "string", "description": "Target CNC machine ID" },
+        "status": { "type": "string", "description": "Status (APPROVED, PENDING_REVIEW, OBSOLETE)" },
+        "versions": { "type": "array", "description": "Drawing revisions history" },
+        "attachedFiles": { "type": "array", "description": "Attached PDF/CAD/DXF files" },
+        "lastModified": { "type": "string", "description": "Last modified timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp of last update" }
+      }
+    },
+    "notifications": {
+      "collection": "notifications",
+      "description": "Urgent drawing change notifications and shopfloor alerts",
+      "documentId": "notificationId",
+      "fields": {
+        "id": { "type": "string", "description": "Notification ID" },
+        "drawingId": { "type": "string", "description": "Related drawing ID" },
+        "drawingCode": { "type": "string", "description": "Related drawing code" },
+        "title": { "type": "string", "description": "Notification title" },
+        "message": { "type": "string", "description": "Detailed alert message" },
+        "version": { "type": "string", "description": "Revision number" },
+        "severity": { "type": "string", "description": "Severity level (URGENT_CHANGE, APPROVED, INFO)" },
+        "timestamp": { "type": "string", "description": "Alert timestamp" },
+        "read": { "type": "boolean", "description": "Read status" }
+      }
+    },
+    "acknowledgments": {
+      "collection": "acknowledgments",
+      "description": "Operator sign-offs confirming receipt and understanding of drawing updates",
+      "documentId": "acknowledgmentId",
+      "fields": {
+        "id": { "type": "string", "description": "Acknowledgment log ID" },
+        "drawingId": { "type": "string", "description": "Acknowledged drawing ID" },
+        "drawingCode": { "type": "string", "description": "Acknowledged drawing code" },
+        "version": { "type": "string", "description": "Drawing version acknowledged" },
+        "operatorName": { "type": "string", "description": "Operator full name" },
+        "operatorId": { "type": "string", "description": "Operator ID/Badge" },
+        "departmentId": { "type": "string", "description": "Operator department" },
+        "machineNo": { "type": "string", "description": "Machine station ID" },
+        "timestamp": { "type": "string", "description": "Sign-off timestamp" }
+      }
+    },
+    "system_status": {
+      "collection": "system_status",
+      "description": "Health and metadata tracking for the database",
+      "documentId": "metadata",
+      "fields": {
+        "databaseName": { "type": "string", "description": "miyamoto-dwg-app-db" },
+        "lastSyncedAt": { "type": "string", "description": "Timestamp of last synchronization" },
+        "totalDrawings": { "type": "number", "description": "Total drawing count" },
+        "totalDepartments": { "type": "number", "description": "Total department count" }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "Cloud Drawing Tablet Hub",
+  "description": "ระบบจัดเก็บและแสดงแบบดรออิ้งวิศวกรรมสำหรับแท็บเล็ตในสายการผลิต อัปเดตแบบเรียลไทม์ แจ้งเตือนเวอร์ชันทันที บันทึกประวัติและเปรียบเทียบเวอร์ชันอัตโนมัติ รองรับการทำงานออฟไลน์และซิงค์ข้อมูลกับคลาวด์",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
