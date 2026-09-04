@@ -1,19 +1,49 @@
 import React, { useState } from 'react';
-import { X, Download, FileText, Image, Code, Printer, Check, Box } from 'lucide-react';
+import { X, Download, FileText, Image, Code, Printer, Check, Box, Eye, ShieldAlert } from 'lucide-react';
 import { Drawing, DrawingVersion } from '../types';
 
 interface ExportModalProps {
   drawing: Drawing;
   activeVersion: DrawingVersion;
   onClose: () => void;
+  isAdmin?: boolean;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   drawing,
   activeVersion,
   onClose,
+  isAdmin = false,
 }) => {
   const [copied, setCopied] = useState(false);
+
+  // If user is not admin, prevent downloading and show security notice
+  if (!isAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="bg-slate-900 border border-amber-500/50 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center mx-auto mb-3">
+            <Eye className="w-6 h-6" />
+          </div>
+          <h3 className="text-base font-bold text-white mb-2 flex items-center justify-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <span>โหมดดูได้อย่างเดียว (ห้ามดาวน์โหลด)</span>
+          </h3>
+          <p className="text-xs text-slate-300 mb-5 leading-relaxed">
+            ระบบความปลอดภัยของโรงงานกำหนดให้ผู้ใช้งานทั่วไปสามารถตรวจสอบแบบดรออิ้งบนหน้าจอได้เท่านั้น
+            การส่งออกไฟล์ CAD, PDF, DXF, PNG และข้อมูลสเปกจำกัดสิทธิ์เฉพาะผู้ดูแลระบบ (Admin)
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition"
+          >
+            เข้าใจแล้ว / ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // 1. Export CAD DXF (AutoCAD Drawing Exchange Format)
   const handleExportDXF = () => {

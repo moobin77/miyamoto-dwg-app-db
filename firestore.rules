@@ -42,5 +42,22 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isValidId(statusId);
     }
+
+    // Authorized Users Whitelist
+    match /authorized_users/{userId} {
+      allow read: if true;
+      allow write: if isValidId(userId);
+    }
+
+    // Security Settings & Policies
+    match /security_settings/{settingId} {
+      allow read: if true;
+      allow write: if isValidId(settingId);
+    }
+
+    // Access Requests from prospective operators
+    match /access_requests/{reqId} {
+      allow read, write: if isValidId(reqId);
+    }
   }
 }

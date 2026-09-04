@@ -16,6 +16,9 @@ import {
   SlidersHorizontal,
   Mail,
   LogOut,
+  Lock,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
 import {
   Drawing,
@@ -56,6 +59,8 @@ import { AddDrawingFileModal } from './components/AddDrawingFileModal';
 import { SafeguardDeleteModal, SafeguardDeleteTarget } from './components/SafeguardDeleteModal';
 import { ManageSeriesModal } from './components/ManageSeriesModal';
 import { GmailAuthModal } from './components/GmailAuthModal';
+import { SecurityGateway } from './components/SecurityGateway';
+import { AccessControlModal } from './components/AccessControlModal';
 import { FirebaseSyncBadge } from './components/FirebaseSyncBadge';
 import {
   DATABASE_NAME,
@@ -63,6 +68,14 @@ import {
   subscribeToFirebaseDepartments,
   testFirebaseConnection,
 } from './services/firebase';
+import {
+  SUPER_ADMIN_EMAIL,
+  getCurrentSession,
+  setCurrentSession,
+  isScreenLocked,
+  setScreenLocked,
+  fetchSecurityConfig,
+} from './services/securityService';
 import { soundEffects } from './services/sound';
 
 export default function App() {
@@ -88,20 +101,16 @@ export default function App() {
   // Series Management
   const [isManageSeriesOpen, setIsManageSeriesOpen] = useState<boolean>(false);
 
-  // Gmail Authentication
+  // Security & Authentication States (Protects drawing data from unauthorized access)
   const [isGmailAuthOpen, setIsGmailAuthOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<{
-    displayName: string;
-    email: string;
-    photoURL?: string;
-  } | null>(() => {
-    try {
-      const saved = localStorage.getItem('miyamoto_current_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    return getCurrentSession();
   });
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const session = getCurrentSession();
+    return isScreenLocked() || !session;
+  });
+  const [isAccessControlOpen, setIsAccessControlOpen] = useState<boolean>(false);
 
   // Safeguard Delete Modal (Requires typing 'ลบ' or 'DELETE' to confirm)
   const [isSafeguardOpen, setIsSafeguardOpen] = useState<boolean>(false);
@@ -224,6 +233,39 @@ export default function App() {
       }
     }
   }, [selectedDepartmentId, selectedDrawingId]);
+
+  // Auto-lock inactivity listener to prevent unauthorized peeking when away
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const resetInactivity = () => {
+      if (timer) clearTimeout(timer);
+      if (currentUser && !isLocked) {
+        fetchSecurityConfig()
+          .then((cfg) => {
+            if (cfg.autoLockMinutes && cfg.autoLockMinutes > 0) {
+              timer = setTimeout(() => {
+                setIsLocked(true);
+                setScreenLocked(true);
+              }, cfg.autoLockMinutes * 60 * 1000);
+            }
+          })
+          .catch(() => {});
+      }
+    };
+
+    resetInactivity();
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    const handleActivity = () => resetInactivity();
+
+    activityEvents.forEach((evt) => window.addEventListener(evt, handleActivity, { passive: true }));
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      activityEvents.forEach((evt) => window.removeEventListener(evt, handleActivity));
+    };
+  }, [currentUser, isLocked]);
 
   // Real-time SSE Connection & Listeners
   useEffect(() => {
@@ -617,8 +659,32 @@ export default function App() {
     );
   };
 
+  // Security Gateway Unlocking & Session Management
+  const handleUnlock = (user: UserProfile) => {
+    setCurrentUser(user);
+    setCurrentSession(user);
+    setIsLocked(false);
+    setScreenLocked(false);
+    if (user.role === 'ADMIN' || user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
+    soundEffects.playSuccessChime();
+  };
+
+  const handleLockScreen = () => {
+    setIsLocked(true);
+    setScreenLocked(true);
+    soundEffects.playClick();
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
+    setCurrentSession(null);
+    setIsLocked(true);
+    setScreenLocked(true);
+    setIsAdmin(false);
     localStorage.removeItem('miyamoto_current_user');
     soundEffects.playClick();
   };
@@ -805,6 +871,52 @@ export default function App() {
     }));
   };
 
+  // Admin Delete Old Attached File
+  const handleDeleteAttachedFile = async (drawingId: string, fileId: string) => {
+    try {
+      const res = await api.deleteAttachedFile(drawingId, fileId);
+      if (res && res.drawing) {
+        setDrawings((prev) => prev.map((d) => (d.id === drawingId ? res.drawing! : d)));
+      } else {
+        setDrawings((prev) =>
+          prev.map((d) => {
+            if (d.id === drawingId) {
+              return {
+                ...d,
+                attachedFiles: (d.attachedFiles || []).filter((f) => f.id !== fileId),
+              };
+            }
+            return d;
+          })
+        );
+      }
+      if (targetDrawingForFile && targetDrawingForFile.id === drawingId) {
+        setTargetDrawingForFile((prev) =>
+          prev
+            ? {
+                ...prev,
+                attachedFiles: (prev.attachedFiles || []).filter((f) => f.id !== fileId),
+              }
+            : null
+        );
+      }
+      setNotifications((prev) => [
+        {
+          id: `notif-${Date.now()}`,
+          title: 'ลบไฟล์เก่าสำเร็จ',
+          message: 'ไฟล์ถูกลบออกจากระบบและพื้นที่จัดเก็บเรียบร้อยแล้ว',
+          type: 'REV_CHANGE',
+          timestamp: new Date().toLocaleTimeString(),
+          read: false,
+        },
+        ...prev,
+      ]);
+    } catch (err) {
+      console.error('Failed to delete attached file', err);
+      alert('เกิดข้อผิดพลาดในการลบไฟล์: ' + (err as Error).message);
+    }
+  };
+
   // Acknowledge Revision
   const handleAcknowledge = async (comment: string) => {
     if (!activeDrawing || !activeVersion) return;
@@ -891,6 +1003,12 @@ export default function App() {
   const currentDepartment =
     departments.find((d) => d.id === selectedDepartmentId) || departments[0];
 
+  // CLOAK BARRIER: If not authenticated or locked, render ONLY the Security Gateway!
+  // Unauthorized users will see ABSOLUTELY NOTHING of the drawings, models, specs, or CAD files!
+  if (isLocked || !currentUser) {
+    return <SecurityGateway onUnlock={handleUnlock} />;
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
       {/* GLOBAL APPLICATION HEADER */}
@@ -931,8 +1049,8 @@ export default function App() {
 
         {/* Right: Gmail Auth, Admin Mode Toggle, Offline Sync Badge & Notifications */}
         <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Gmail / Google Login & User Status */}
-          {currentUser ? (
+          {/* Authorized User Profile & Controls */}
+          {currentUser && (
             <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/90 px-2 py-1 rounded-xl shadow-inner">
               <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0 border border-white/20">
                 {currentUser.photoURL ? (
@@ -947,13 +1065,20 @@ export default function App() {
                 )}
               </div>
               <div className="hidden lg:block text-left min-w-0 max-w-[130px]">
-                <div className="text-[11px] font-semibold text-white truncate leading-tight">
-                  {currentUser.displayName}
+                <div className="text-[11px] font-semibold text-white truncate leading-tight flex items-center gap-1">
+                  <span>{currentUser.displayName}</span>
+                  {currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && (
+                    <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
+                      SUPER
+                    </span>
+                  )}
                 </div>
                 <div className="text-[9px] text-blue-300 truncate leading-tight">
-                  {currentUser.email}
+                  {currentUser.role} • {currentUser.email}
                 </div>
               </div>
+
+              {/* Sign Out Button */}
               <button
                 type="button"
                 onClick={handleLogout}
@@ -963,19 +1088,34 @@ export default function App() {
                 <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
-          ) : (
+          )}
+
+          {/* Quick Screen Lock Button (Blocks screen immediately when stepping away) */}
+          <button
+            id="lock-screen-btn"
+            type="button"
+            onClick={handleLockScreen}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-red-950/60 text-red-300 border border-red-500/40 hover:bg-red-900/60 transition flex items-center gap-1.5 shadow-sm"
+            title="ล็อคหน้าจอด่วน เพื่อป้องกันคนไม่ได้รับอนุญาตมองเห็นข้อมูล (Lock Screen)"
+          >
+            <Lock className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden sm:inline font-semibold">ล็อคหน้าจอ</span>
+          </button>
+
+          {/* Access Control & Whitelist Manager (Admin only) */}
+          {isAdmin && (
             <button
-              id="login-gmail-btn"
+              id="manage-access-btn"
               type="button"
               onClick={() => {
-                setIsGmailAuthOpen(true);
+                setIsAccessControlOpen(true);
                 soundEffects.playClick();
               }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-blue-600/20 text-blue-300 border border-blue-500/30 hover:bg-blue-600/30 transition flex items-center gap-1.5 shadow-sm"
-              title="เข้าสู่ระบบด้วย Gmail หรือ Google Account"
+              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-600/20 text-red-200 border border-red-500/50 hover:bg-red-600/30 transition flex items-center gap-1.5 shadow-sm"
+              title="จัดการสิทธิ์ผู้ใช้งานและ Whitelist (Access Control & Whitelist)"
             >
-              <Mail className="w-3.5 h-3.5 text-blue-400" />
-              <span className="hidden sm:inline">เข้าสู่ระบบ Gmail</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden md:inline">จัดการสิทธิ์ (Whitelist)</span>
             </button>
           )}
 
@@ -1101,6 +1241,7 @@ export default function App() {
             isAdmin={isAdmin}
             onOpenEditJob={() => handleOpenEditJob(activeDrawing)}
             onOpenAddFile={() => handleOpenAddFile(activeDrawing)}
+            onDeleteAttachedFile={handleDeleteAttachedFile}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
@@ -1157,13 +1298,15 @@ export default function App() {
         isOpen={isGmailAuthOpen}
         onClose={() => setIsGmailAuthOpen(false)}
         onSuccess={(user) => {
-          setCurrentUser(user);
-          localStorage.setItem('miyamoto_current_user', JSON.stringify(user));
-          if (user.role === 'ADMIN') {
-            setIsAdmin(true);
-          }
-          soundEffects.playSuccessChime();
+          handleUnlock(user);
         }}
+      />
+
+      {/* 1.4 Access Control & Whitelist Modal (Admin) */}
+      <AccessControlModal
+        isOpen={isAccessControlOpen}
+        onClose={() => setIsAccessControlOpen(false)}
+        currentUserEmail={currentUser?.email || ''}
       />
 
       {/* 2. Add Length Modal (Admin) */}
@@ -1214,6 +1357,8 @@ export default function App() {
           drawing={targetDrawingForFile || activeDrawing}
           onSubmit={handleSubmitAddDrawingFile}
           onSubmitFile={handleSubmitAddDrawingFile}
+          onDeleteFile={handleDeleteAttachedFile}
+          isAdmin={isAdmin}
           onOpenParametricCreator={() => {
             const target = targetDrawingForFile || activeDrawing;
             if (target) {

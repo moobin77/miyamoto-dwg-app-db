@@ -19,6 +19,8 @@ import {
   Globe,
   ExternalLink,
   Loader2,
+  Trash2,
+  Eye,
 } from 'lucide-react';
 import { Drawing, AttachedDrawingFile } from '../types';
 import { api } from '../services/api';
@@ -46,6 +48,8 @@ interface AddDrawingFileModalProps {
     notes?: string;
   }) => Promise<void>;
   onOpenParametricCreator?: () => void;
+  onDeleteFile?: (drawingId: string, fileId: string) => Promise<void>;
+  isAdmin?: boolean;
 }
 
 export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
@@ -55,9 +59,26 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
   onSubmitFile,
   onSubmit,
   onOpenParametricCreator,
+  onDeleteFile,
+  isAdmin = true,
 }) => {
   const handleSaveDrawingFile = onSubmitFile || onSubmit;
   const [activeTab, setActiveTab] = useState<'UPLOAD' | 'GDRIVE' | 'PARAMETRIC' | 'CLOUD'>('UPLOAD');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteOldFile = async (fileId: string, fileName: string) => {
+    if (!onDeleteFile || !drawing) return;
+    const ok = window.confirm(`คุณแน่ใจหรือไม่ที่จะลบไฟล์เก่า "${fileName}" ออกจากระบบ?`);
+    if (!ok) return;
+    try {
+      setDeletingId(fileId);
+      await onDeleteFile(drawing.id, fileId);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   // File Upload State
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -916,34 +937,58 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
                       </div>
                     </div>
 
-                    {file.dataUrl ? (
-                      <a
-                        href={file.dataUrl}
-                        download={file.fileName}
-                        className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-medium transition"
-                      >
-                        ดาวน์โหลด
-                      </a>
-                    ) : file.fileUrl ? (
-                      <a
-                        href={file.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-[11px] font-medium transition flex items-center gap-1"
-                      >
-                        {file.fileUrl.includes('drive.google.com') ? (
-                          <>
-                            <Globe className="w-3 h-3" />
-                            <span>เปิดดูบน Google Drive</span>
-                          </>
-                        ) : (
-                          <>
-                            <ExternalLink className="w-3 h-3" />
-                            <span>เปิดดูไฟล์</span>
-                          </>
-                        )}
-                      </a>
-                    ) : null}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isAdmin ? (
+                        <>
+                          {file.dataUrl ? (
+                            <a
+                              href={file.dataUrl}
+                              download={file.fileName}
+                              className="px-2.5 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-medium transition"
+                            >
+                              ดาวน์โหลด
+                            </a>
+                          ) : file.fileUrl ? (
+                            <a
+                              href={file.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2.5 py-1 rounded-lg bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 text-[11px] font-medium transition flex items-center gap-1"
+                            >
+                              {file.fileUrl.includes('drive.google.com') ? (
+                                <>
+                                  <Globe className="w-3 h-3" />
+                                  <span>เปิดดู</span>
+                                </>
+                              ) : (
+                                <>
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span>เปิดดู</span>
+                                </>
+                              )}
+                            </a>
+                          ) : null}
+
+                          {onDeleteFile && (
+                            <button
+                              type="button"
+                              disabled={deletingId === file.id}
+                              onClick={() => handleDeleteOldFile(file.id, file.fileName)}
+                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/30 transition text-xs flex items-center gap-1"
+                              title="ลบไฟล์เก่านี้ (เฉพาะแอดมิน)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span className="hidden sm:inline">ลบไฟล์</span>
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[11px] px-2 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium flex items-center gap-1 select-none">
+                          <Eye className="w-3 h-3 text-amber-400" />
+                          <span>ดูได้อย่างเดียว</span>
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -25,6 +25,8 @@ import {
   FileCode,
   File,
   FileText,
+  Trash2,
+  ShieldAlert,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Drawing, DrawingVersion, CriticalDimension, AttachedDrawingFile } from '../types';
@@ -47,6 +49,7 @@ interface DrawingViewerProps {
   isAdmin?: boolean;
   onOpenEditJob?: () => void;
   onOpenAddFile?: () => void;
+  onDeleteAttachedFile?: (drawingId: string, fileId: string) => Promise<void>;
 }
 
 export const DrawingViewer: React.FC<DrawingViewerProps> = ({
@@ -65,6 +68,7 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
   isAdmin = false,
   onOpenEditJob,
   onOpenAddFile,
+  onDeleteAttachedFile,
 }) => {
   // Zoom and Pan transform state
   const [zoom, setZoom] = useState<number>(1);
@@ -78,6 +82,29 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
   const [showFilesList, setShowFilesList] = useState<boolean>(false);
   const [selectedDimId, setSelectedDimId] = useState<string | null>(null);
   const [activeViewFile, setActiveViewFile] = useState<AttachedDrawingFile | null>(null);
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
+
+  // Handle delete attached file (Admin only)
+  const handleDeleteFile = async (file: AttachedDrawingFile) => {
+    if (!isAdmin || !onDeleteAttachedFile) return;
+    const confirmed = window.confirm(
+      `คุณต้องการลบไฟล์แนบเก่า "${file.fileName}" ออกจากแบบดรออิ้งนี้หรือไม่?\n(เฉพาะแอดมินเท่านั้นที่สามารถลบไฟล์ได้)`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingFileId(file.id);
+      await onDeleteAttachedFile(drawing.id, file.id);
+      if (activeViewFile?.id === file.id) {
+        const remaining = (drawing.attachedFiles || []).filter((f) => f.id !== file.id);
+        setActiveViewFile(remaining.length > 0 ? remaining[0] : null);
+      }
+    } catch (err) {
+      console.error('Failed to delete file:', err);
+    } finally {
+      setDeletingFileId(null);
+    }
+  };
 
   // Acknowledgment dialog state
   const [isAckModalOpen, setIsAckModalOpen] = useState(false);
@@ -336,14 +363,25 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
             <span className="hidden sm:inline">ประวัติ ECO</span>
           </button>
 
-          {/* Standard Export */}
-          <button
-            onClick={onOpenExport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">ส่งออก</span>
-          </button>
+          {/* Standard Export (Admin Only) / View Only Badge (Users) */}
+          {isAdmin ? (
+            <button
+              onClick={onOpenExport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 transition"
+              title="ส่งออกไฟล์ (เฉพาะแอดมิน)"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">ส่งออก</span>
+            </button>
+          ) : (
+            <span
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/30 select-none"
+              title="ระบบความปลอดภัย: ผู้ใช้งานทั่วไปสามารถดูได้อย่างเดียว ห้ามดาวน์โหลดไฟล์ออกนอกระบบ"
+            >
+              <Eye className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">ดูได้อย่างเดียว (ห้ามโหลด)</span>
+            </span>
+          )}
 
           {/* Attached Files List Popover */}
           {drawing.attachedFiles && drawing.attachedFiles.length > 0 && (
@@ -359,9 +397,12 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
               </button>
 
               {showFilesList && (
-                <div className="absolute right-0 top-full mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 p-2 text-xs space-y-1.5">
+                <div className="absolute right-0 top-full mt-2 w-80 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-30 p-2 text-xs space-y-1.5">
                   <div className="flex items-center justify-between px-2 py-1 border-b border-slate-800 text-[11px] font-bold text-slate-300">
-                    <span>ไฟล์แนบ ({drawing.attachedFiles.length} รายการ)</span>
+                    <span className="flex items-center gap-1.5">
+                      <Paperclip className="w-3 h-3 text-indigo-400" />
+                      <span>ไฟล์แนบ ({drawing.attachedFiles.length} รายการ)</span>
+                    </span>
                     <button
                       type="button"
                       onClick={() => setShowFilesList(false)}
@@ -370,7 +411,7 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="max-h-56 overflow-y-auto space-y-1">
+                  <div className="max-h-64 overflow-y-auto space-y-1.5 p-0.5">
                     {drawing.attachedFiles.map((f) => (
                       <div
                         key={f.id}
@@ -380,7 +421,7 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                             : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/50'
                         }`}
                       >
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="font-semibold text-white truncate text-[11px]">
                             {f.fileName}
                           </div>
@@ -389,6 +430,7 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                          {/* All users can view on screen */}
                           <button
                             type="button"
                             onClick={() => {
@@ -405,24 +447,47 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                             <Eye className="w-2.5 h-2.5" />
                             <span>{activeViewFile?.id === f.id ? 'กำลังดู' : 'ดูบนจอ'}</span>
                           </button>
-                          {f.dataUrl ? (
-                            <a
-                              href={f.dataUrl}
-                              download={f.fileName}
-                              className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0"
-                            >
-                              ดาวน์โหลด
-                            </a>
-                          ) : f.fileUrl ? (
-                            <a
-                              href={f.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shrink-0 flex items-center gap-1"
-                            >
-                              เปิด <ExternalLink className="w-2.5 h-2.5" />
-                            </a>
-                          ) : null}
+
+                          {/* Only ADMIN can download */}
+                          {isAdmin && (
+                            <>
+                              {f.dataUrl ? (
+                                <a
+                                  href={f.dataUrl}
+                                  download={f.fileName}
+                                  className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-bold shrink-0 flex items-center gap-0.5"
+                                  title="ดาวน์โหลดไฟล์ (Admin Only)"
+                                >
+                                  <Download className="w-2.5 h-2.5" />
+                                  <span>โหลด</span>
+                                </a>
+                              ) : f.fileUrl ? (
+                                <a
+                                  href={f.fileUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] font-bold shrink-0 flex items-center gap-0.5"
+                                  title="เปิดไฟล์ (Admin Only)"
+                                >
+                                  <ExternalLink className="w-2.5 h-2.5" />
+                                  <span>เปิด</span>
+                                </a>
+                              ) : null}
+
+                              {/* Admin Delete Old File Button */}
+                              {onDeleteAttachedFile && (
+                                <button
+                                  type="button"
+                                  disabled={deletingFileId === f.id}
+                                  onClick={() => handleDeleteFile(f)}
+                                  className="p-1 rounded bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/30 transition text-[10px]"
+                                  title="ลบไฟล์เก่านี้ (เฉพาะแอดมิน)"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -626,6 +691,11 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onContextMenu={(e) => {
+            if (!isAdmin) {
+              e.preventDefault();
+            }
+          }}
         >
           {/* Transformed Drawing Content */}
           <div
@@ -655,26 +725,51 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
                       <Layers className="w-3 h-3" />
                       <span>กลับไปดู CAD Blueprint</span>
                     </button>
-                    {activeViewFile.dataUrl ? (
-                      <a
-                        href={activeViewFile.dataUrl}
-                        download={activeViewFile.fileName}
-                        className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1 transition"
-                      >
-                        <Download className="w-3 h-3" />
-                        <span>ดาวน์โหลด</span>
-                      </a>
-                    ) : activeViewFile.fileUrl ? (
-                      <a
-                        href={activeViewFile.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1 transition"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        <span>เปิด</span>
-                      </a>
-                    ) : null}
+
+                    {isAdmin ? (
+                      <>
+                        {activeViewFile.dataUrl ? (
+                          <a
+                            href={activeViewFile.dataUrl}
+                            download={activeViewFile.fileName}
+                            className="text-[11px] px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold flex items-center gap-1 transition"
+                            title="ดาวน์โหลดไฟล์ลงเครื่อง (Admin Only)"
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>ดาวน์โหลด</span>
+                          </a>
+                        ) : activeViewFile.fileUrl ? (
+                          <a
+                            href={activeViewFile.fileUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1 transition"
+                            title="เปิดดูไฟล์ต้นฉบับ (Admin Only)"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>เปิด</span>
+                          </a>
+                        ) : null}
+
+                        {onDeleteAttachedFile && (
+                          <button
+                            type="button"
+                            disabled={deletingFileId === activeViewFile.id}
+                            onClick={() => handleDeleteFile(activeViewFile)}
+                            className="text-[11px] px-2.5 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/25 text-red-400 border border-red-500/30 font-semibold flex items-center gap-1 transition"
+                            title="ลบไฟล์เก่านี้ออกจากระบบ (Admin Only)"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>ลบไฟล์เก่า</span>
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-[11px] px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 font-medium flex items-center gap-1 select-none">
+                        <Eye className="w-3 h-3 text-amber-400" />
+                        <span>ดูได้อย่างเดียว (ห้ามดาวน์โหลด)</span>
+                      </span>
+                    )}
                   </div>
                 </div>
 

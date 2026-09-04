@@ -844,6 +844,61 @@ app.post('/api/drawings/:id/files', (req: Request, res: Response) => {
   res.status(201).json({ success: true, file: newFile, drawing });
 });
 
+// Admin deletes an old/unused attached file from a drawing
+app.delete('/api/drawings/:id/files/:fileId', (req: Request, res: Response) => {
+  const { id, fileId } = req.params;
+
+  const drawing = drawings.find((d) => d.id === id);
+  if (!drawing) {
+    return res.status(404).json({ error: 'Drawing not found' });
+  }
+
+  if (!drawing.attachedFiles || drawing.attachedFiles.length === 0) {
+    return res.status(404).json({ error: 'No attached files found in this drawing' });
+  }
+
+  const fileIndex = drawing.attachedFiles.findIndex((f) => f.id === fileId);
+  if (fileIndex === -1) {
+    return res.status(404).json({ error: 'Attached file not found' });
+  }
+
+  const removedFile = drawing.attachedFiles[fileIndex];
+  drawing.attachedFiles.splice(fileIndex, 1);
+  drawing.lastUpdated = new Date().toLocaleString('th-TH', { hour12: false });
+
+  // If there's an uploaded file on disk, remove it safely
+  if (removedFile.fileUrl && removedFile.fileUrl.startsWith('/api/files/')) {
+    const rawFilename = removedFile.fileUrl.replace('/api/files/', '');
+    const decodedFilename = decodeURIComponent(rawFilename);
+    const diskPath = path.join(UPLOADS_DIR, decodedFilename);
+    if (fs.existsSync(diskPath)) {
+      try {
+        fs.unlinkSync(diskPath);
+      } catch (e) {
+        console.warn('Could not remove physical file from disk:', e);
+      }
+    }
+  }
+
+  const notif: NotificationAlert = {
+    id: `notif-file-del-${Date.now()}`,
+    drawingId: drawing.id,
+    drawingCode: drawing.code,
+    title: `ลบไฟล์แนบเก่า: ${removedFile.fileName}`,
+    message: `แอดมินลบไฟล์แนบที่ไม่ได้ใช้ ${removedFile.fileName} ออกจากแบบ ${drawing.code}`,
+    version: drawing.currentVersion,
+    severity: 'URGENT_CHANGE',
+    timestamp: new Date().toLocaleString('th-TH'),
+    read: false,
+  };
+  notifications.unshift(notif);
+
+  broadcast('drawing_updated', drawing);
+  broadcast('notification', notif);
+
+  res.json({ success: true, message: 'Deleted file successfully', drawing, deletedFileId: fileId });
+});
+
 // 7. Acknowledge revision sign-off
 app.post('/api/drawings/:id/acknowledge', (req: Request, res: Response) => {
   const { id } = req.params;

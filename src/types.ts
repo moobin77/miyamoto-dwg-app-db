@@ -184,7 +184,8 @@ export interface OfflineQueueItem {
     | 'ADD_LENGTH'
     | 'DELETE_LENGTH'
     | 'UPDATE_DRAWING'
-    | 'ADD_ATTACHED_FILE';
+    | 'ADD_ATTACHED_FILE'
+    | 'DELETE_ATTACHED_FILE';
   drawingId?: string;
   payload: any;
   timestamp: number;
@@ -196,4 +197,37 @@ export interface SyncStatus {
   isSyncing: boolean;
   pendingCount: number;
   lastSyncedAt: string | null;
+}
+
+export interface AuthorizedUser {
+  id: string;
+  email: string;
+  displayName: string;
+  role: 'ADMIN' | 'ENGINEER' | 'OPERATOR';
+  department?: DepartmentId | 'ALL';
+  status: 'ACTIVE' | 'REVOKED';
+  addedAt: string;
+  addedBy?: string;
+  lastAccessedAt?: string;
+  isOwner?: boolean;
+}
+
+export interface AccessRequest {
+  id: string;
+  email: string;
+  displayName: string;
+  requestedRole: 'ADMIN' | 'ENGINEER' | 'OPERATOR';
+  department?: DepartmentId;
+  reason?: string;
+  requestedAt: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+}
+
+export interface SecurityConfig {
+  mode: 'STRICT_WHITELIST' | 'ALLOW_KIOSK_PIN' | 'LOCKDOWN';
+  kioskPin: string;
+  autoLockMinutes: number;
+  allowedDomain?: string;
+  updatedAt: string;
+  updatedBy: string;
 }

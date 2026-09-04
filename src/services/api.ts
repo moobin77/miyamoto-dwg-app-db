@@ -1050,6 +1050,55 @@ class ApiService {
     }
   }
 
+  // Admin deletes an attached file from a drawing
+  async deleteAttachedFile(
+    drawingId: string,
+    fileId: string
+  ): Promise<{ success: boolean; drawing?: Drawing; deletedFileId?: string }> {
+    const isOnline = this.isEffectivelyOnline();
+
+    // Optimistically update local cache
+    const localDrawings = getLocalDrawings();
+    const d = localDrawings.find((x) => x.id === drawingId);
+    if (d && d.attachedFiles) {
+      d.attachedFiles = d.attachedFiles.filter((f) => f.id !== fileId);
+      d.lastUpdated = new Date().toLocaleString('th-TH', { hour12: false });
+      saveLocalDrawings(localDrawings);
+      // Sync to Firebase Firestore
+      saveDrawingToFirestore(d).catch(console.warn);
+    }
+
+    if (!isOnline) {
+      addToOfflineQueue({
+        action: 'DELETE_ATTACHED_FILE',
+        drawingId,
+        payload: { fileId },
+      });
+      soundEffects.playTrash();
+      return { success: true, drawing: d, deletedFileId: fileId };
+    }
+
+    try {
+      const res = await fetch(`/api/drawings/${drawingId}/files/${fileId}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (data.drawing) {
+        saveDrawingToFirestore(data.drawing).catch(console.warn);
+      }
+      soundEffects.playTrash();
+      return data;
+    } catch {
+      addToOfflineQueue({
+        action: 'DELETE_ATTACHED_FILE',
+        drawingId,
+        payload: { fileId },
+      });
+      soundEffects.playTrash();
+      return { success: true, drawing: d, deletedFileId: fileId };
+    }
+  }
+
   // Synchronize offline queue to cloud server
   async syncOfflineQueue(): Promise<{ success: boolean; syncedCount: number; drawings?: Drawing[] }> {
     const queue = getOfflineQueue();
