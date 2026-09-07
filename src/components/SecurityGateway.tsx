@@ -211,6 +211,7 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
                       placeholder="เช่น ช่างเจษฎา"
                       value={nameInput}
                       onChange={(e) => setNameInput(e.target.value)}
+                      required
                       className="w-full bg-slate-950 border border-slate-700 px-3 py-2.5 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                     />
                   </div>

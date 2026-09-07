@@ -109,8 +109,21 @@ export async function fetchAuthorizedUsers(): Promise<AuthorizedUser[]> {
     if (!snap.empty) {
       const remoteUsers = snap.docs.map((d) => d.data() as AuthorizedUser);
       // Ensure super admin is included
-      if (!remoteUsers.some((u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
+      const hasSuperAdmin = remoteUsers.some((u) => u.id === 'user-superadmin-01' || (u.email && u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()));
+      if (!hasSuperAdmin) {
         remoteUsers.unshift(DEFAULT_WHITELIST[0]);
+      } else {
+        // Just to be safe from duplicate ids from other bugs, deduplicate by id
+        const idSet = new Set();
+        const deduplicated = [];
+        for (const u of remoteUsers) {
+          if (!idSet.has(u.id)) {
+            idSet.add(u.id);
+            deduplicated.push(u);
+          }
+        }
+        remoteUsers.length = 0;
+        remoteUsers.push(...deduplicated);
       }
       saveLocalWhitelist(remoteUsers);
       return remoteUsers;
