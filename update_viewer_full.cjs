@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+const fs = require('fs');
+
+const code = `import React, { useState } from 'react';
 import { Drawing, DrawingVersion, AttachedFile } from '../types';
-import { TechnicalBlueprint } from './TechnicalBlueprints';
+import { TechnicalBlueprints } from './TechnicalBlueprints';
 
 interface DrawingViewerProps {
   drawing: Drawing;
@@ -58,13 +60,12 @@ export function DrawingViewer({
               </div>
           </div>
           <div className="dwg-canvas">
-              <div className="blueprint-container" style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center center' }}>
-                  <TechnicalBlueprint
-                    drawing={drawing}
-                    activeVersion={activeVersion}
-                    showDiff={false}
+              <div className="blueprint-container" style={{ transform: \`scale(\${zoom / 100})\`, transformOrigin: 'center center' }}>
+                  <TechnicalBlueprints
+                    type={activeVersion.svgType || 'shaft'}
+                    dimensions={activeVersion.criticalDimensions}
+                    lengthLabel={drawing.lengthLabel}
                     theme={theme}
-                    selectedDimId={null}
                   />
               </div>
           </div>
@@ -111,7 +112,7 @@ export function DrawingViewer({
                 onClick={() => onAcknowledge(drawing.id, activeVersion.version, 'OPERATOR')}
                 disabled={isAcknowledgedByCurrentOp}
               >
-                {isAcknowledgedByCurrentOp ? 'Acknowledge Signed' : `ลงชื่อรับทราบแบบ (Rev ${activeVersion.version})`}
+                {isAcknowledgedByCurrentOp ? 'Acknowledge Signed' : \`ลงชื่อรับทราบแบบ (Rev \${activeVersion.version})\`}
               </button>
               
               {isAdmin && (
@@ -130,3 +131,7 @@ export function DrawingViewer({
     </>
   );
 }
+\`
+
+fs.writeFileSync('src/components/DrawingViewer.tsx', code);
+console.log("Updated DrawingViewer.tsx");

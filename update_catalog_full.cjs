@@ -1,4 +1,6 @@
-import React from 'react';
+const fs = require('fs');
+
+const code = `import React from 'react';
 import { Department, Drawing, DepartmentId } from '../types';
 
 interface DrawingCatalogProps {
@@ -49,7 +51,7 @@ export function DrawingCatalog({
           return (
             <div 
               key={dept.id} 
-              className={`dept-card ${isSelected ? 'selected' : ''}`}
+              className={\`dept-card \${isSelected ? 'selected' : ''}\`}
               onClick={() => onSelectDepartment(dept.id)}
             >
               <h5>{dept.label}</h5>
@@ -76,7 +78,7 @@ export function DrawingCatalog({
                 return (
                   <div 
                     key={dwg.id} 
-                    className={`list-item ${isSelected ? 'selected' : ''}`}
+                    className={\`list-item \${isSelected ? 'selected' : ''}\`}
                     onClick={() => onSelectDrawing(dwg)}
                   >
                     <span style={{fontSize:'10px', fontWeight:700, opacity:0.6}}>SERIES: {series.name}</span>
@@ -96,7 +98,7 @@ export function DrawingCatalog({
              return (
               <div 
                 key={dwg.id} 
-                className={`list-item ${isSelected ? 'selected' : ''}`}
+                className={\`list-item \${isSelected ? 'selected' : ''}\`}
                 onClick={() => onSelectDrawing(dwg)}
               >
                 <span className="item-code">{dwg.code}</span>
@@ -109,3 +111,7 @@ export function DrawingCatalog({
     </aside>
   );
 }
+\`
+
+fs.writeFileSync('src/components/DrawingCatalog.tsx', code);
+console.log("Updated DrawingCatalog.tsx");

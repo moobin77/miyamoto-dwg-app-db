@@ -87,8 +87,16 @@ export default function App() {
   const [theme, setTheme] = useState<'blueprint' | 'dark' | 'light'>(settings.theme || 'blueprint');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
 
-  // Admin access mode toggle (Defaults to true to allow immediate admin demonstration)
-  const [isAdmin, setIsAdmin] = useState<boolean>(true);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+    return getCurrentSession();
+  });
+  
+  // Admin access state
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    const session = getCurrentSession();
+    if (!session) return false;
+    return session.role === 'ADMIN' || session.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+  });
 
   // Admin Modals
   const [isAddModelOpen, setIsAddModelOpen] = useState<boolean>(false);
@@ -102,9 +110,6 @@ export default function App() {
 
   // Security & Authentication States (Protects drawing data from unauthorized access)
   const [isGmailAuthOpen, setIsGmailAuthOpen] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
-    return getCurrentSession();
-  });
   const [isLocked, setIsLocked] = useState<boolean>(() => {
     const session = getCurrentSession();
     return isScreenLocked() || !session;
@@ -1036,174 +1041,31 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-950 font-sans text-slate-100">
-      {/* GLOBAL APPLICATION HEADER */}
-      <header className="h-14 bg-slate-900 border-b border-slate-800 px-4 flex items-center justify-between z-30 select-none shadow-lg shrink-0">
-        {/* Left: Branding & Sidebar Toggle */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700 transition"
-            title={sidebarOpen ? 'ซ่อนโครงสร้างแผนก (Hide Hierarchy)' : 'แสดงโครงสร้างแผนก (Show Hierarchy)'}
-          >
-            {sidebarOpen ? (
-              <PanelLeftClose className="w-4 h-4" />
-            ) : (
-              <PanelLeftOpen className="w-4 h-4 text-blue-400" />
-            )}
-          </button>
-
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-600/30">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm text-white tracking-wide font-tech">
-                  CLOUD DRAWING HUB
-                </span>
-                <span className="hidden sm:inline-block px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                  3 DEPARTMENTS • TABLET
-                </span>
-              </div>
-              <p className="text-[10px] text-slate-400 hidden md:block">
-                ระบบจัดเก็บดรออิ้งแยกแผนก SAS / PTS / OTS • บริหารรุ่น &amp; ความยาว
-              </p>
-            </div>
-          </div>
+    <>
+      <div className="utility-bar">
+        <div className="sys-id">SYSTEM: CLOUD_DRAWING_HUB_V3.0.4</div>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+          <div className="meta-item"><span style={{ color: '#10b981' }}>●</span> FB: {DATABASE_NAME.toUpperCase()}</div>
+          <div className="meta-item">USER: {currentUser.role === 'ADMIN' ? 'SUPER ADMIN' : currentUser.displayName.toUpperCase()}</div>
         </div>
+      </div>
 
-        {/* Right: Gmail Auth, Admin Mode Toggle, Offline Sync Badge & Notifications */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* Authorized User Profile & Controls */}
-          {currentUser && (
-            <div className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700/90 px-2 py-1 rounded-xl shadow-inner">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white flex items-center justify-center text-[10px] font-bold overflow-hidden shrink-0 border border-white/20">
-                {currentUser.photoURL ? (
-                  <img
-                    src={currentUser.photoURL}
-                    alt={currentUser.displayName}
-                    className="w-full h-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  currentUser.displayName.charAt(0).toUpperCase()
-                )}
-              </div>
-              <div className="hidden lg:block text-left min-w-0 max-w-[130px]">
-                <div className="text-[11px] font-semibold text-white truncate leading-tight flex items-center gap-1">
-                  <span>{currentUser.displayName}</span>
-                  {currentUser.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase() && (
-                    <span className="text-[8px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">
-                      SUPER
-                    </span>
-                  )}
-                </div>
-                <div className="text-[9px] text-blue-300 truncate leading-tight">
-                  {currentUser.role} • {currentUser.email}
-                </div>
-              </div>
-
-              {/* Sign Out Button */}
-              <button
-                type="button"
-                onClick={handleLogout}
-                title="ออกจากระบบ (Sign Out)"
-                className="p-1 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition ml-0.5"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-
-          {/* Quick Screen Lock Button (Blocks screen immediately when stepping away) */}
-          <button
-            id="lock-screen-btn"
-            type="button"
-            onClick={handleLockScreen}
-            className="px-2.5 py-1.5 rounded-xl text-xs font-medium bg-red-950/60 text-red-300 border border-red-500/40 hover:bg-red-900/60 transition flex items-center gap-1.5 shadow-sm"
-            title="ล็อคหน้าจอด่วน เพื่อป้องกันคนไม่ได้รับอนุญาตมองเห็นข้อมูล (Lock Screen)"
-          >
-            <Lock className="w-3.5 h-3.5 text-red-400" />
-            <span className="hidden sm:inline font-semibold">ล็อคหน้าจอ</span>
-          </button>
-
-          {/* Access Control & Whitelist Manager (Admin only) */}
+      <header className="portal-header">
+        <div className="brand"><h1>Drawing Portal</h1></div>
+        <div className="header-meta">
+          <div className="meta-item"><span className="meta-label">ID:</span> {activeDrawing?.code || 'NO DRAWING SELECTED'}</div>
+          <div className="meta-item"><span className="meta-label">Rev:</span> <span className="rev-badge">{effectiveActiveVersion?.version || '-'}</span></div>
+          <div className="meta-item"><span className="meta-label">Status:</span> {effectiveActiveVersion?.isApprovedForProduction ? 'APPROVED PRODUCTION' : 'PENDING REVIEW'}</div>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
+          <button className="btn btn-fill" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={handleLockScreen}>Lock Session</button>
           {isAdmin && (
-            <button
-              id="manage-access-btn"
-              type="button"
-              onClick={() => {
-                setIsAccessControlOpen(true);
-                soundEffects.playClick();
-              }}
-              className="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-red-600/20 text-red-200 border border-red-500/50 hover:bg-red-600/30 transition flex items-center gap-1.5 shadow-sm"
-              title="จัดการสิทธิ์ผู้ใช้งานและ Whitelist (Access Control & Whitelist)"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-red-400" />
-              <span className="hidden md:inline">จัดการสิทธิ์ (Whitelist)</span>
-            </button>
+            <button className="btn" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={() => setIsAccessControlOpen(true)}>Whitelist Control</button>
           )}
-
-          {/* Admin Mode Toggle Pill for Easy Testing */}
-          <button
-            id="toggle-admin-mode-btn"
-            type="button"
-            onClick={() => {
-              setIsAdmin(!isAdmin);
-              soundEffects.playClick();
-            }}
-            className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition flex items-center gap-1.5 shadow-sm ${
-              isAdmin
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-slate-200'
-            }`}
-            title="สลับโหมดแอดมิน (Admin) เพื่อเพิ่ม/ลบรุ่นและความยาว"
-          >
-            {isAdmin ? (
-              <>
-                <Shield className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-bold">โหมดแอดมิน (Admin)</span>
-              </>
-            ) : (
-              <>
-                <User className="w-3.5 h-3.5 text-slate-400" />
-                <span>ฝ่ายผลิต (Operator)</span>
-              </>
-            )}
-          </button>
-
-          {/* Firebase Database Status & Manual Sync Badge */}
-          <FirebaseSyncBadge
-            databaseName={DATABASE_NAME}
-            isSyncing={isSyncingFirebase}
-            lastSyncedAt={lastFirebaseSync}
-            totalDrawings={drawings.length}
-            totalDepartments={departments.length}
-            onSync={handleSyncAllToFirebase}
-          />
-
-          {/* Offline Sync Badge */}
-          <OfflineSyncBadge
-            syncStatus={syncStatus}
-            onToggleSimulatedOffline={handleToggleSimulatedOffline}
-            onTriggerSync={triggerSync}
-          />
-
-          {/* Real-time Notification Center */}
-          <NotificationCenter
-            notifications={notifications}
-            onSelectDrawing={(id) => setSelectedDrawingId(id)}
-            onMarkAsRead={(id) => {
-              setNotifications((prev) =>
-                prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-              );
-            }}
-          />
         </div>
       </header>
 
-      {/* REVISION ALERT BANNER (Urgent Warning if operator views outdated version) */}
+      {/* REVISION ALERT BANNER */}
       {activeDrawing && activeVersion && (
         <RevisionAlertBanner
           drawing={activeDrawing}
@@ -1212,9 +1074,8 @@ export default function App() {
         />
       )}
 
-      {/* MAIN CONTENT AREA */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Drawing Catalog Sidebar (Hierarchical Department -> Model -> Length) */}
+      <div className="workspace">
+        {/* Drawing Catalog Sidebar */}
         {sidebarOpen && (
           <DrawingCatalog
             departments={departments}
@@ -1270,11 +1131,18 @@ export default function App() {
             onDeleteAttachedFile={handleDeleteAttachedFile}
           />
         ) : (
-          <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-dim)' }}>
             <RefreshCw className="w-5 h-5 animate-spin mr-2" />
             กำลังโหลดข้อมูลดรออิ้งจากคลาวด์...
           </div>
         )}
+      </div>
+
+      <div className="footer-metrics">
+        <span>STORAGE: {drawings.length} DOCUMENT UNITS</span>
+        <span>MODIFIED: {new Date().toLocaleString()}</span>
+        <span>STATION ID: {settings.machineId}</span>
+        <span>ENCRYPTION: AES-256 ACTIVE</span>
       </div>
 
       {/* MODALS */}
@@ -1453,6 +1321,6 @@ export default function App() {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
