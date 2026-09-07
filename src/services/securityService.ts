@@ -21,6 +21,7 @@ export const DEFAULT_WHITELIST: AuthorizedUser[] = [
   {
     id: 'user-superadmin-01',
     username: 'admin',
+    email: SUPER_ADMIN_EMAIL,
     password: 'password', // Default admin password
     displayName: 'Super Admin (ผู้ดูแลระบบหลัก)',
     role: 'ADMIN',
