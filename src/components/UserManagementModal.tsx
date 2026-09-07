@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Users, UserPlus, KeyRound, Trash2, CheckCircle2, AlertTriangle, X, ShieldCheck } from 'lucide-react';
-import { fetchAuthorizedUsers, addAuthorizedUser, deleteAuthorizedUser, updateAuthorizedUser } from '../services/securityService';
+import { fetchAuthorizedUsers, addAuthorizedUser, deleteAuthorizedUser, updateAuthorizedUser, SUPER_ADMIN_EMAIL } from '../services/securityService';
 import { AuthorizedUser, DepartmentId } from '../types';
 
 interface UserManagementModalProps {
@@ -223,13 +223,13 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                           </button>
                         </div>
                       ) : (
-                        (currentUser?.isOwner || u.role !== 'ADMIN' || u.id === currentUser?.id) && (
+                        (currentUser?.email === SUPER_ADMIN_EMAIL || u.role !== 'ADMIN' || u.id === currentUser?.id) && (
                           <button onClick={() => setEditingUserId(u.id)} className="p-1.5 bg-slate-800 text-slate-400 hover:text-slate-200 rounded-md transition" title="เปลี่ยนรหัสผ่าน">
                             <KeyRound className="w-4 h-4" />
                           </button>
                         )
                       )}
-                      {!u.isOwner && (currentUser?.isOwner || u.role !== 'ADMIN') && (
+                      {!u.isOwner && (currentUser?.email === SUPER_ADMIN_EMAIL || u.role !== 'ADMIN') && (
                         <button onClick={() => handleDelete(u.id)} className="p-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-md transition" title="ลบบัญชี">
                           <Trash2 className="w-4 h-4" />
                         </button>
