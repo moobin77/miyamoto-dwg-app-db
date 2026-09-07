@@ -70,7 +70,7 @@ export function DrawingCatalog({
                 }`}
                 onClick={() => onSelectDepartment(dept.id)}
               >
-                {dept.label} [{dept.models?.length || 0}]
+                {dept.id} [{dept.models?.length || 0}]
               </button>
             );
           })}

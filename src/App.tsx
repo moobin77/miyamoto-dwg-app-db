@@ -110,10 +110,7 @@ export default function App() {
 
   // Security & Authentication States (Protects drawing data from unauthorized access)
   const [isGmailAuthOpen, setIsGmailAuthOpen] = useState<boolean>(false);
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    const session = getCurrentSession();
-    return isScreenLocked() || !session;
-  });
+  const [isLocked, setIsLocked] = useState<boolean>(true);
   const [isAccessControlOpen, setIsAccessControlOpen] = useState<boolean>(false);
 
   // Safeguard Delete Modal (Requires typing 'ลบ' or 'DELETE' to confirm)

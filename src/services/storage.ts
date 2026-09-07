@@ -32,7 +32,12 @@ export function getLocalDepartments(): DepartmentInfo[] {
       saveLocalDepartments(INITIAL_DEPARTMENTS);
       return INITIAL_DEPARTMENTS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.find((d: any) => d.id === 'BOM')) {
+      saveLocalDepartments(INITIAL_DEPARTMENTS);
+      return INITIAL_DEPARTMENTS;
+    }
+    return parsed;
   } catch (e) {
     console.error('Failed to read local departments:', e);
     return INITIAL_DEPARTMENTS;
