@@ -177,9 +177,12 @@ export async function addAuthorizedUser(
   // Firestore update
   try {
     const db = getFirebaseDb();
-    await setDoc(doc(db, 'authorized_users', newUser.id), newUser);
+    // Remove undefined fields
+    const cleanUser = Object.fromEntries(Object.entries(newUser).filter(([_, v]) => v !== undefined));
+    await setDoc(doc(db, 'authorized_users', newUser.id), cleanUser);
   } catch (err) {
     console.warn('Failed to persist authorized user to Firestore:', err);
+    throw err;
   }
 
   return newUser;
@@ -200,9 +203,11 @@ export async function updateAuthorizedUser(
 
     try {
       const db = getFirebaseDb();
-      await setDoc(doc(db, 'authorized_users', userId), list[index], { merge: true });
+      const cleanUpdates = Object.fromEntries(Object.entries(list[index]).filter(([_, v]) => v !== undefined));
+      await setDoc(doc(db, 'authorized_users', userId), cleanUpdates, { merge: true });
     } catch (err) {
       console.warn('Failed to update authorized user in Firestore:', err);
+      throw err;
     }
   }
 }

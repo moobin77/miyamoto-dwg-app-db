@@ -67,6 +67,21 @@ export function DrawingViewer({
           )}
           <button className="btn btn-outline" onClick={onOpenAuditTrail}>History</button>
           
+          {isAdmin && (
+            <>
+              {onOpenEditJob && (
+                <button className="btn btn-outline text-amber-400 border-amber-900/50 hover:bg-amber-500/10" onClick={onOpenEditJob}>
+                  แก้ไข
+                </button>
+              )}
+              {onOpenAddFile && (
+                <button className="btn btn-outline text-indigo-400 border-indigo-900/50 hover:bg-indigo-500/10" onClick={onOpenAddFile}>
+                  เพิ่มไฟล์แนบ
+                </button>
+              )}
+            </>
+          )}
+          
           <button 
             className={`btn ${isAcknowledgedByCurrentOp ? 'bg-emerald-900/50 text-emerald-400 border-emerald-900' : 'btn-primary'}`}
             onClick={() => onAcknowledge(drawing.id, activeVersion.version, 'OPERATOR')}

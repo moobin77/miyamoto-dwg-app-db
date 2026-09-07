@@ -67,8 +67,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setNewPassword('');
       setNewName('');
       loadUsers();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      alert('เพิ่มผู้ใช้ล้มเหลว: ' + err.message);
     }
   };
 
@@ -89,9 +90,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       setEditingUserId(null);
       setEditingPassword('');
       loadUsers();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('เปลี่ยนรหัสผ่านล้มเหลว');
+      alert('เปลี่ยนรหัสผ่านล้มเหลว: ' + err.message);
     }
   };
 

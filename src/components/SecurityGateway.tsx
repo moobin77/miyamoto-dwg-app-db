@@ -67,6 +67,7 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
   const handleKioskPinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pinInput.trim()) return;
+    if (!nameInput.trim()) { setErrorMessage("กรุณาระบุชื่อช่าง (Operator Name)"); return; }
 
     try {
       setIsVerifying(true);
