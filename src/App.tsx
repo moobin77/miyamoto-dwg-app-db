@@ -1040,41 +1040,56 @@ export default function App() {
     return <SecurityGateway onUnlock={handleUnlock} />;
   }
 
+  
   return (
-    <>
-      <div className="utility-bar">
-        <div className="sys-id">SYSTEM: CLOUD_DRAWING_HUB_V3.0.4</div>
-        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
-          <div className="meta-item"><span style={{ color: '#10b981' }}>●</span> FB: {DATABASE_NAME.toUpperCase()}</div>
-          <div className="meta-item">USER: {currentUser.role === 'ADMIN' ? 'SUPER ADMIN' : currentUser.displayName.toUpperCase()}</div>
+    <div className="grid grid-rows-[56px_1fr_28px] h-screen w-screen overflow-hidden bg-[#0f1115] text-[#e2e8f0] font-sans">
+      <header className="bg-[#1a1d23] border-b-2 border-[#e2e8f0] px-6 flex items-center justify-between z-50">
+        <div className="flex items-center gap-4">
+          <button 
+            className="btn btn-outline" 
+            style={{ padding: '4px 8px' }}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          >
+            ☰
+          </button>
+          <h1 className="font-['Syne'] text-xl tracking-tighter uppercase font-bold">Cloud Drawing Hub</h1>
+          <div className="flex gap-1 hidden sm:flex">
+            <span className="meta-label">{departments.length} Depts</span>
+            <span className="meta-label">Tablet Optimized</span>
+          </div>
         </div>
-      </div>
-
-      <header className="portal-header">
-        <div className="brand"><h1>Drawing Portal</h1></div>
-        <div className="header-meta">
-          <div className="meta-item"><span className="meta-label">ID:</span> {activeDrawing?.code || 'NO DRAWING SELECTED'}</div>
-          <div className="meta-item"><span className="meta-label">Rev:</span> <span className="rev-badge">{effectiveActiveVersion?.version || '-'}</span></div>
-          <div className="meta-item"><span className="meta-label">Status:</span> {effectiveActiveVersion?.isApprovedForProduction ? 'APPROVED PRODUCTION' : 'PENDING REVIEW'}</div>
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: '10px' }}>
-          <button className="btn btn-fill" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={handleLockScreen}>Lock Session</button>
+        
+        <div className="flex items-center gap-4">
+          <div className="text-right hidden md:block">
+            <p className="text-[0.7rem] font-bold">{currentUser.displayName}</p>
+            <button onClick={handleLogout} className="text-[0.6rem] text-[#3b82f6] hover:underline">
+              {currentUser.role} • Sign Out
+            </button>
+          </div>
+          
+          <button 
+            className="btn btn-primary bg-red-500 hover:bg-red-600" 
+            onClick={handleLockScreen}
+          >
+            Lock Screen
+          </button>
+          
           {isAdmin && (
-            <button className="btn" style={{ padding: '6px 12px', fontSize: '10px' }} onClick={() => setIsAccessControlOpen(true)}>Whitelist Control</button>
+            <button 
+              className="btn btn-outline hidden sm:flex"
+              onClick={() => setIsUserManagementOpen(true)}
+            >
+              Whitelist
+            </button>
           )}
+
+          <div className="meta-label bg-black border border-[#3b82f6] hidden lg:flex items-center gap-2">
+            Firebase: {DATABASE_NAME} <span className="status-dot"></span>
+          </div>
         </div>
       </header>
 
-      {/* REVISION ALERT BANNER */}
-      {activeDrawing && activeVersion && (
-        <RevisionAlertBanner
-          drawing={activeDrawing}
-          activeVersion={activeVersion}
-          onSwitchToLatest={handleSwitchToLatest}
-        />
-      )}
-
-      <div className="workspace">
+      <main className={`grid ${sidebarOpen ? 'grid-cols-[320px_1fr]' : 'grid-cols-[0px_1fr]'} overflow-hidden relative transition-all duration-300`}>
         {/* Drawing Catalog Sidebar */}
         {sidebarOpen && (
           <DrawingCatalog
@@ -1136,9 +1151,8 @@ export default function App() {
             กำลังโหลดข้อมูลดรออิ้งจากคลาวด์...
           </div>
         )}
-      </div>
-
-      <div className="footer-metrics">
+      </main>
+      <div className="h-8 bg-slate-900 border-t border-slate-800 flex items-center justify-between px-4 text-[10px] text-slate-500 font-mono shrink-0">
         <span>STORAGE: {drawings.length} DOCUMENT UNITS</span>
         <span>MODIFIED: {new Date().toLocaleString()}</span>
         <span>STATION ID: {settings.machineId}</span>
@@ -1321,6 +1335,6 @@ export default function App() {
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }

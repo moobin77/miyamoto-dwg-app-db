@@ -1,51 +1,7 @@
-import React, { useState } from 'react';
-import { Drawing, DrawingVersion, AttachedFile } from '../types';
-import { TechnicalBlueprint } from './TechnicalBlueprints';
-import { ZoomIn, ZoomOut, Maximize, Clock, FileDiff, Download, History, PenTool, CheckCircle, Share2, Upload } from 'lucide-react';
+const fs = require('fs');
+let code = fs.readFileSync('src/components/DrawingViewer.tsx', 'utf8');
 
-interface DrawingViewerProps {
-  drawing: Drawing;
-  activeVersion: DrawingVersion;
-  onVersionChange: (v: DrawingVersion) => void;
-  onOpenAuditTrail: () => void;
-  onOpenDiffModal: () => void;
-  onOpenNewRevision: () => void;
-  onOpenExport: () => void;
-  onAcknowledge: (drawingId: string, version: string, opName: string) => void;
-  onUpdateInspection: (drawingId: string, inspectionItemNo: string, val: string) => void;
-  isAcknowledgedByCurrentOp: boolean;
-  theme: 'blueprint' | 'dark' | 'light';
-  onToggleTheme: (theme: 'blueprint' | 'dark' | 'light') => void;
-  isAdmin: boolean;
-  onOpenEditJob?: () => void;
-  onOpenAddFile?: () => void;
-  onDeleteAttachedFile?: (file: AttachedFile) => void;
-}
-
-export function DrawingViewer({
-  drawing,
-  activeVersion,
-  onVersionChange,
-  onOpenAuditTrail,
-  onOpenDiffModal,
-  onOpenNewRevision,
-  onOpenExport,
-  onAcknowledge,
-  onUpdateInspection,
-  isAcknowledgedByCurrentOp,
-  theme,
-  onToggleTheme,
-  isAdmin,
-  onOpenEditJob,
-  onOpenAddFile,
-}: DrawingViewerProps) {
-  const [zoom, setZoom] = useState(100);
-
-  const handleZoomIn = () => setZoom(prev => Math.min(prev + 20, 300));
-  const handleZoomOut = () => setZoom(prev => Math.max(prev - 20, 20));
-  const handleZoomReset = () => setZoom(100);
-
-  
+const newViewer = `
   return (
     <div className="bg-[#0b0d11] relative flex flex-col h-full overflow-hidden">
       
@@ -68,11 +24,11 @@ export function DrawingViewer({
           <button className="btn btn-outline" onClick={onOpenAuditTrail}>History</button>
           
           <button 
-            className={`btn ${isAcknowledgedByCurrentOp ? 'bg-emerald-900/50 text-emerald-400 border-emerald-900' : 'btn-primary'}`}
+            className={\`btn \${isAcknowledgedByCurrentOp ? 'bg-emerald-900/50 text-emerald-400 border-emerald-900' : 'btn-primary'}\`}
             onClick={() => onAcknowledge(drawing.id, activeVersion.version, 'OPERATOR')}
             disabled={isAcknowledgedByCurrentOp}
           >
-            {isAcknowledgedByCurrentOp ? 'Acknowledged' : `Sign Off Rev ${activeVersion.version}`}
+            {isAcknowledgedByCurrentOp ? 'Acknowledged' : \`Sign Off Rev \${activeVersion.version}\`}
           </button>
         </div>
       </div>
@@ -80,7 +36,7 @@ export function DrawingViewer({
       <div className="viewer-stage relative flex-1 flex items-center justify-center overflow-auto p-8">
         <div 
           className="transition-transform duration-200 origin-center relative w-full h-full min-w-[800px] min-h-[600px] flex items-center justify-center" 
-          style={{ transform: `scale(${zoom / 100})` }}
+          style={{ transform: \`scale(\${zoom / 100})\` }}
         >
           <TechnicalBlueprint
             drawing={drawing}
@@ -109,12 +65,12 @@ export function DrawingViewer({
                 <button
                   key={v.version}
                   onClick={() => onVersionChange(v)}
-                  className={`w-full text-left p-3 border-b border-[rgba(226,232,240,0.05)] transition-colors ${
+                  className={\`w-full text-left p-3 border-b border-[rgba(226,232,240,0.05)] transition-colors \${
                     v.version === activeVersion.version ? 'bg-[rgba(59,130,246,0.1)]' : 'hover:bg-[rgba(255,255,255,0.02)]'
-                  }`}
+                  }\`}
                 >
                   <div className="flex justify-between items-center">
-                    <span className={`font-bold font-['JetBrains_Mono'] text-sm ${v.version === activeVersion.version ? 'text-[#3b82f6]' : 'text-white'}`}>Rev {v.version}</span>
+                    <span className={\`font-bold font-['JetBrains_Mono'] text-sm \${v.version === activeVersion.version ? 'text-[#3b82f6]' : 'text-white'}\`}>Rev {v.version}</span>
                     <span className="text-[10px] text-[rgba(226,232,240,0.5)]">{v.releaseDate.substring(0, 10)}</span>
                   </div>
                 </button>
@@ -129,5 +85,8 @@ export function DrawingViewer({
       </div>
     </div>
   );
+`;
 
-}
+code = code.replace(/return \(\s*<div className="flex-1 flex flex-col h-full overflow-hidden[^>]*>[\s\S]*?<\/div>\s*\);\s*}/m, newViewer + "\n}");
+
+fs.writeFileSync('src/components/DrawingViewer.tsx', code);

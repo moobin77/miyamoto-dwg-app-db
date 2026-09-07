@@ -1,5 +1,6 @@
 import React from 'react';
 import { Department, Drawing, DepartmentId } from '../types';
+import { Folder, FileText, ChevronRight, Hash, Layers } from 'lucide-react';
 
 interface DrawingCatalogProps {
   departments: Department[];
@@ -32,37 +33,68 @@ export function DrawingCatalog({
   selectedDrawingId,
   onSelectDrawing,
   selectedDepartmentId,
-  onSelectDepartment
+  onSelectDepartment,
+  isAdmin,
+  onOpenAddModel,
+  onOpenAddLength,
+  onDeleteModel,
+  onDeleteLength,
+  onOpenEditJob,
+  onOpenEditModel,
+  onOpenAddFile,
+  onOpenAddFileGuide,
+  onOpenManageSeries,
+  onOpenAddSeries,
+  onOpenEditSeries,
+  onDeleteSeries,
+  operatorName,
+  stationLine,
+  machineId
 }: DrawingCatalogProps) {
   const currentDept = departments.find(d => d.id === selectedDepartmentId) || departments[0];
 
+  
+  
   return (
-    <aside className="pane-hierarchy" id="drawing-catalog-sidebar">
-      <div className="pane-title">
-        <span>Departments</span>
-        <span>{departments.length} ACTIVE</span>
+    <div className="bg-[#1a1d23] border-r border-[rgba(226,232,240,0.1)] flex flex-col h-full overflow-hidden w-full select-none shrink-0">
+      <div className="p-5 border-b border-[rgba(226,232,240,0.1)]">
+        <p className="meta-label mb-2 inline-block">Select Department</p>
+        <div className="grid grid-cols-2 gap-[1px] bg-[rgba(226,232,240,0.1)] my-2">
+          {departments.map(dept => {
+            const isSelected = dept.id === selectedDepartmentId;
+            return (
+              <button 
+                key={dept.id} 
+                className={`p-3 border-none text-[0.7rem] font-semibold cursor-pointer text-center transition-colors ${
+                  isSelected ? 'bg-[#3b82f6] text-white' : 'bg-[#1a1d23] text-[rgba(226,232,240,0.5)] hover:bg-[rgba(255,255,255,0.02)]'
+                }`}
+                onClick={() => onSelectDepartment(dept.id)}
+              >
+                {dept.label} [{dept.models?.length || 0}]
+              </button>
+            );
+          })}
+        </div>
+        {isAdmin && onOpenManageSeries && (
+          <button 
+            className="btn btn-primary w-full mt-2" 
+            onClick={() => onOpenManageSeries(selectedDepartmentId)}
+          >
+            + Add Series
+          </button>
+        )}
       </div>
-      <div className="dept-grid">
-        {departments.map(dept => {
-          const isSelected = dept.id === selectedDepartmentId;
-          const seriesCount = dept.series?.length || 0;
-          return (
-            <div 
-              key={dept.id} 
-              className={`dept-card ${isSelected ? 'selected' : ''}`}
-              onClick={() => onSelectDepartment(dept.id)}
-            >
-              <h5>{dept.label}</h5>
-              <span>{seriesCount} Series</span>
-            </div>
-          );
-        })}
+
+      <div className="p-3 bg-[rgba(0,0,0,0.2)]">
+        <input 
+          type="text" 
+          placeholder="Search code, title or job..."
+          className="w-full bg-transparent border border-[rgba(226,232,240,0.1)] text-[#e2e8f0] p-2 text-xs font-inherit rounded-sm focus:outline-none focus:border-[#3b82f6] transition-colors"
+        />
       </div>
-      
-      <div className="pane-title"><span>Document Catalog</span></div>
-      <div className="list-container">
+
+      <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-slate-700">
         {currentDept?.series?.map(series => {
-          // get drawings for this series
           const seriesModels = currentDept.models?.filter(m => m.seriesId === series.id) || [];
           const modelIds = seriesModels.map(m => m.id);
           const seriesDrawings = drawings.filter(d => modelIds.includes(d.modelId));
@@ -70,42 +102,62 @@ export function DrawingCatalog({
           if (seriesDrawings.length === 0) return null;
           
           return (
-            <React.Fragment key={series.id}>
-              {seriesDrawings.map(dwg => {
-                const isSelected = selectedDrawingId === dwg.id;
-                return (
-                  <div 
-                    key={dwg.id} 
-                    className={`list-item ${isSelected ? 'selected' : ''}`}
-                    onClick={() => onSelectDrawing(dwg)}
-                  >
-                    <span style={{fontSize:'10px', fontWeight:700, opacity:0.6}}>SERIES: {series.name}</span>
-                    <span className="item-code">{dwg.code}</span>
-                    <span className="item-title">{dwg.name || dwg.lengthLabel}</span>
-                  </div>
-                );
-              })}
-            </React.Fragment>
+            <div key={series.id} className="mb-4">
+              <div className="text-[0.65rem] text-[rgba(226,232,240,0.5)] mb-2 font-extrabold uppercase tracking-widest">{series.name}</div>
+              
+              <div className="space-y-2">
+                {seriesDrawings.map(dwg => {
+                  const isSelected = selectedDrawingId === dwg.id;
+                  return (
+                    <div 
+                      key={dwg.id} 
+                      className={`p-3 border-l-2 cursor-pointer transition-colors ${
+                        isSelected 
+                          ? 'border-[#3b82f6] bg-[rgba(59,130,246,0.1)]' 
+                          : 'border-transparent bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.05)]'
+                      }`}
+                      onClick={() => onSelectDrawing(dwg)}
+                    >
+                      <span className="font-['JetBrains_Mono'] text-[0.85rem] block mb-0.5 font-bold">{dwg.code}</span>
+                      <span className="text-[0.7rem] text-[rgba(226,232,240,0.5)] truncate block">{dwg.name || dwg.lengthLabel}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           );
         })}
-        {/* Fallback for models without series or when no series is defined */}
+        {/* Fallback models without series */}
         {currentDept?.models?.filter(m => !m.seriesId).map(model => {
           const modelDrawings = drawings.filter(d => d.modelId === model.id);
-          return modelDrawings.map(dwg => {
-             const isSelected = selectedDrawingId === dwg.id;
-             return (
-              <div 
-                key={dwg.id} 
-                className={`list-item ${isSelected ? 'selected' : ''}`}
-                onClick={() => onSelectDrawing(dwg)}
-              >
-                <span className="item-code">{dwg.code}</span>
-                <span className="item-title">{dwg.name || dwg.lengthLabel}</span>
+          if (modelDrawings.length === 0) return null;
+          return (
+             <div key={model.id} className="mb-4">
+              <div className="text-[0.65rem] text-[rgba(226,232,240,0.5)] mb-2 font-extrabold uppercase tracking-widest">{model.name}</div>
+              
+              <div className="space-y-2">
+                {modelDrawings.map(dwg => {
+                  const isSelected = selectedDrawingId === dwg.id;
+                  return (
+                    <div 
+                      key={dwg.id} 
+                      className={`p-3 border-l-2 cursor-pointer transition-colors ${
+                        isSelected 
+                          ? 'border-[#3b82f6] bg-[rgba(59,130,246,0.1)]' 
+                          : 'border-transparent bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.05)]'
+                      }`}
+                      onClick={() => onSelectDrawing(dwg)}
+                    >
+                      <span className="font-['JetBrains_Mono'] text-[0.85rem] block mb-0.5 font-bold">{dwg.code}</span>
+                      <span className="text-[0.7rem] text-[rgba(226,232,240,0.5)] truncate block">{dwg.name || dwg.lengthLabel}</span>
+                    </div>
+                  );
+                })}
               </div>
-             );
-          })
+            </div>
+          );
         })}
       </div>
-    </aside>
+    </div>
   );
 }
