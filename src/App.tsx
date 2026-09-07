@@ -1089,6 +1089,16 @@ export default function App() {
             </button>
           )}
 
+          {isAdmin && (
+            <FirebaseSyncBadge
+              isSyncing={isSyncingFirebase}
+              lastSyncedAt={lastFirebaseSync}
+              onSync={handleSyncAllToFirebase}
+              totalDepartments={departments.length}
+              totalDrawings={drawings.length}
+            />
+          )}
+
           <div className="meta-label bg-black border border-[#3b82f6] hidden lg:flex items-center gap-2">
             Firebase: {DATABASE_NAME} <span className="status-dot"></span>
           </div>

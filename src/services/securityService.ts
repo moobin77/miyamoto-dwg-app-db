@@ -153,9 +153,11 @@ export async function saveSecurityConfig(config: SecurityConfig): Promise<void> 
   saveLocalConfig(config);
   try {
     const db = getFirebaseDb();
-    await setDoc(doc(db, 'security_settings', 'config'), config);
+    const cleanConfig = Object.fromEntries(Object.entries(config).filter(([_, v]) => v !== undefined));
+    await setDoc(doc(db, 'security_settings', 'config'), cleanConfig);
   } catch (err) {
     console.warn('Failed to sync security config to Firestore:', err);
+    throw err;
   }
 }
 
