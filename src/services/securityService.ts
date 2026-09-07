@@ -151,13 +151,21 @@ export async function addAuthorizedUser(
   const newUser: AuthorizedUser = {
     ...user,
     id: `auth-user-${Date.now().toString(36)}`,
-    email: user.email.trim().toLowerCase(),
+    email: user.email ? user.email.trim().toLowerCase() : undefined,
+    username: user.username ? user.username.trim().toLowerCase() : undefined,
     addedAt: new Date().toISOString(),
   };
 
   // Local update
   const list = getLocalWhitelist();
-  const existingIndex = list.findIndex((u) => u.email.toLowerCase() === newUser.email.toLowerCase());
+  let existingIndex = -1;
+  
+  if (newUser.username) {
+    existingIndex = list.findIndex((u) => u.username?.toLowerCase() === newUser.username?.toLowerCase());
+  } else if (newUser.email) {
+    existingIndex = list.findIndex((u) => u.email?.toLowerCase() === newUser.email?.toLowerCase());
+  }
+
   if (existingIndex >= 0) {
     list[existingIndex] = { ...list[existingIndex], ...newUser, id: list[existingIndex].id };
   } else {
