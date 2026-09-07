@@ -345,6 +345,15 @@ export const INITIAL_DEPARTMENTS: DepartmentInfo[] = [
       },
     ],
   },
+  {
+    id: 'BOM',
+    code: 'BOM',
+    name: 'แผนก BOM',
+    nameEn: 'Bill of Materials',
+    description: 'รายการส่วนประกอบและโครงสร้างชิ้นงาน',
+    series: [],
+    models: []
+  }
 ];
 
 // Helper function to create an associated full Drawing for any added model and length

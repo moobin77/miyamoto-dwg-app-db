@@ -65,6 +65,7 @@ import {
   DATABASE_NAME,
   subscribeToFirebaseDrawings,
   subscribeToFirebaseDepartments,
+  saveDepartmentToFirestore,
   testFirebaseConnection,
 } from './services/firebase';
 import {
@@ -76,6 +77,7 @@ import {
   fetchSecurityConfig,
 } from './services/securityService';
 import { soundEffects } from './services/sound';
+import { INITIAL_DEPARTMENTS } from './data/departmentsData';
 
 export default function App() {
   const [departments, setDepartments] = useState<DepartmentInfo[]>(getLocalDepartments());
@@ -388,6 +390,13 @@ export default function App() {
       });
       unsubFbDepts = subscribeToFirebaseDepartments((fbDepts) => {
         if (fbDepts && fbDepts.length > 0) {
+          if (!fbDepts.find((d) => d.id === 'BOM')) {
+             const bom = INITIAL_DEPARTMENTS.find((d) => d.id === 'BOM');
+             if (bom) {
+                fbDepts.push(bom);
+                saveDepartmentToFirestore(bom).catch(console.error);
+             }
+          }
           setDepartments(fbDepts);
         }
       });
@@ -1074,7 +1083,7 @@ export default function App() {
           {isAdmin && (
             <button 
               className="btn btn-outline hidden sm:flex"
-              onClick={() => setIsUserManagementOpen(true)}
+              onClick={() => setIsAccessControlOpen(true)}
             >
               Whitelist
             </button>
