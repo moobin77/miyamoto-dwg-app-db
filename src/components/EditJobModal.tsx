@@ -17,6 +17,9 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({
 }) => {
   const [title, setTitle] = useState('');
   const [titleEn, setTitleEn] = useState('');
+  const [modelName, setModelName] = useState('');
+  const [lengthLabel, setLengthLabel] = useState('');
+  const [lengthMm, setLengthMm] = useState<number | ''>('');
   const [drawingCode, setDrawingCode] = useState('');
   const [partNumber, setPartNumber] = useState('');
   const [material, setMaterial] = useState('');
@@ -32,6 +35,9 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({
     if (drawing) {
       setTitle(drawing.title || '');
       setTitleEn(drawing.titleEn || '');
+      setModelName(drawing.modelName || '');
+      setLengthLabel(drawing.lengthLabel || (drawing.lengthMm ? `L = ${drawing.lengthMm} mm` : ''));
+      setLengthMm(drawing.lengthMm ?? '');
       setDrawingCode(drawing.code || '');
       setPartNumber(drawing.partNumber || '');
       setMaterial(drawing.material || '');
@@ -65,8 +71,11 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({
       await onSubmit(drawing.id, {
         title: title.trim(),
         titleEn: titleEn.trim(),
+        modelName: modelName.trim() || undefined,
         code: drawingCode.trim(),
         partNumber: partNumber.trim(),
+        lengthLabel: lengthLabel.trim() || undefined,
+        lengthMm: lengthMm !== '' ? Number(lengthMm) : undefined,
         material: material.trim(),
         treatment: treatment.trim(),
         machineNo: machineNo.trim(),
@@ -155,7 +164,7 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({
                 type="text"
                 value={drawingCode}
                 onChange={(e) => setDrawingCode(e.target.value)}
-                placeholder="เช่น DWG-SAS-C50-0300"
+                placeholder="เช่น DWG-SAS-C50-0300 หรือ C36-501"
                 className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono focus:outline-none focus:border-blue-500 transition"
               />
             </div>
@@ -169,6 +178,46 @@ export const EditJobModal: React.FC<EditJobModalProps> = ({
                 onChange={(e) => setPartNumber(e.target.value)}
                 placeholder="เช่น PN-SAS-C50-L300"
                 className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white font-mono focus:outline-none focus:border-blue-500 transition"
+              />
+            </div>
+          </div>
+
+          {/* Length & Model Grid (Editable by Admin) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-3 rounded-xl bg-slate-850 border border-slate-700/80">
+            <div className="sm:col-span-1">
+              <label className="block text-amber-300 font-bold mb-1">
+                ชื่อขนาด / ป้ายความยาว
+              </label>
+              <input
+                type="text"
+                value={lengthLabel}
+                onChange={(e) => setLengthLabel(e.target.value)}
+                placeholder="เช่น L = 300 mm"
+                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-amber-500/40 text-amber-200 font-medium focus:outline-none focus:border-amber-400 transition"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-amber-300 font-bold mb-1">
+                ความยาวตัวเลข (mm)
+              </label>
+              <input
+                type="number"
+                value={lengthMm}
+                onChange={(e) => setLengthMm(e.target.value === '' ? '' : Number(e.target.value))}
+                placeholder="เช่น 300"
+                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-amber-500/40 text-amber-200 font-mono focus:outline-none focus:border-amber-400 transition"
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-slate-300 font-medium mb-1">
+                ชื่อโมเดล / รุ่น (Model Name)
+              </label>
+              <input
+                type="text"
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}
+                placeholder="เช่น SAS-C50"
+                className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white focus:outline-none focus:border-blue-500 transition"
               />
             </div>
           </div>

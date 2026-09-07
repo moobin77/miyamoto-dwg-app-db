@@ -20,7 +20,8 @@ const SCREEN_LOCKED_KEY = 'miyamoto_screen_locked';
 export const DEFAULT_WHITELIST: AuthorizedUser[] = [
   {
     id: 'user-superadmin-01',
-    email: SUPER_ADMIN_EMAIL,
+    username: 'admin',
+    password: 'password', // Default admin password
     displayName: 'Super Admin (ผู้ดูแลระบบหลัก)',
     role: 'ADMIN',
     department: 'ALL',
@@ -28,26 +29,6 @@ export const DEFAULT_WHITELIST: AuthorizedUser[] = [
     addedAt: '2026-01-01T00:00:00.000Z',
     addedBy: 'SYSTEM',
     isOwner: true,
-  },
-  {
-    id: 'user-qa-lead-02',
-    email: 'engineer.lead@miyamoto.co.th',
-    displayName: 'Chief QA & Production Engineer',
-    role: 'ENGINEER',
-    department: 'ALL',
-    status: 'ACTIVE',
-    addedAt: '2026-01-15T00:00:00.000Z',
-    addedBy: SUPER_ADMIN_EMAIL,
-  },
-  {
-    id: 'user-op-station-03',
-    email: 'operator.sas@miyamoto.co.th',
-    displayName: 'SAS Line Operator 1',
-    role: 'OPERATOR',
-    department: 'SAS',
-    status: 'ACTIVE',
-    addedAt: '2026-02-01T00:00:00.000Z',
-    addedBy: SUPER_ADMIN_EMAIL,
   },
 ];
 
@@ -66,8 +47,8 @@ function getLocalWhitelist(): AuthorizedUser[] {
     const raw = localStorage.getItem(LOCAL_WHITELIST_KEY);
     if (!raw) return DEFAULT_WHITELIST;
     const parsed: AuthorizedUser[] = JSON.parse(raw);
-    // Ensure Super Admin is always present and active
-    if (!parsed.some((u) => u.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase())) {
+    // Ensure admin user is always present
+    if (!parsed.some((u) => u.username?.toLowerCase() === 'admin')) {
       parsed.unshift(DEFAULT_WHITELIST[0]);
     }
     return parsed;
@@ -236,87 +217,32 @@ export async function deleteAuthorizedUser(userId: string): Promise<void> {
 }
 
 // --- Access Verification Engine ---
-export async function verifyUserAuthorization(
-  email: string
+export async function verifyUserCredentials(
+  username: string,
+  password?: string
 ): Promise<{
   authorized: boolean;
   user?: AuthorizedUser;
   reason?: string;
   config: SecurityConfig;
 }> {
-  const cleanEmail = email.trim().toLowerCase();
+  const cleanUsername = username.trim().toLowerCase();
   const config = await fetchSecurityConfig();
 
-  // 1. Emergency Lockdown Check
-  if (config.mode === 'LOCKDOWN') {
-    if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-      return {
-        authorized: true,
-        user: {
-          id: 'superadmin-override',
-          email: SUPER_ADMIN_EMAIL,
-          displayName: 'Super Admin (Lockdown Bypass)',
-          role: 'ADMIN',
-          department: 'ALL',
-          status: 'ACTIVE',
-          addedAt: new Date().toISOString(),
-          isOwner: true,
-        },
-        config,
-      };
-    }
-    return {
-      authorized: false,
-      reason: 'ระบบอยู่ในสถานะ "ฉุกเฉิน (Lockdown)" เพื่อความปลอดภัยสูงสุด เข้าถึงได้เฉพาะ Super Admin เท่านั้น',
-      config,
-    };
-  }
-
-  // 2. Super Admin Instant Pass
-  if (cleanEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-    return {
-      authorized: true,
-      user: {
-        id: 'superadmin-owner',
-        email: SUPER_ADMIN_EMAIL,
-        displayName: 'Super Admin (เจ้าของระบบ)',
-        role: 'ADMIN',
-        department: 'ALL',
-        status: 'ACTIVE',
-        addedAt: new Date().toISOString(),
-        isOwner: true,
-      },
-      config,
-    };
-  }
-
-  // 3. Domain Check (if specified)
-  if (config.allowedDomain && config.allowedDomain.trim()) {
-    const domain = config.allowedDomain.trim().toLowerCase().replace('@', '');
-    if (cleanEmail.endsWith(`@${domain}`)) {
-      return {
-        authorized: true,
-        user: {
-          id: `domain-user-${cleanEmail.replace(/[^a-z0-9]/g, '-')}`,
-          email: cleanEmail,
-          displayName: cleanEmail.split('@')[0],
-          role: 'ENGINEER',
-          department: 'ALL',
-          status: 'ACTIVE',
-          addedAt: new Date().toISOString(),
-        },
-        config,
-      };
-    }
-  }
-
-  // 4. Whitelist Verification
+  // Whitelist Verification
   const whitelist = await fetchAuthorizedUsers();
   const match = whitelist.find(
-    (u) => u.email.toLowerCase() === cleanEmail && u.status === 'ACTIVE'
+    (u) => u.username?.toLowerCase() === cleanUsername && u.status === 'ACTIVE'
   );
 
   if (match) {
+    if (match.password !== password) {
+      return {
+        authorized: false,
+        reason: 'รหัสผ่านไม่ถูกต้อง',
+        config,
+      };
+    }
     // Record last accessed time
     updateAuthorizedUser(match.id, { lastAccessedAt: new Date().toISOString() }).catch(() => {});
     return {
@@ -328,7 +254,7 @@ export async function verifyUserAuthorization(
 
   return {
     authorized: false,
-    reason: `บัญชีอีเมล (${cleanEmail}) ยังไม่ได้รับอนุญาตให้เข้าถึงระบบข้อมูลการผลิตลับเฉพาะ กรุณาติดต่อผู้ดูแลระบบ`,
+    reason: `ไม่พบบัญชีผู้ใช้ (${cleanUsername}) หรือบัญชีถูกระงับ`,
     config,
   };
 }

@@ -21,9 +21,11 @@ import {
   Loader2,
   Trash2,
   Eye,
+  Search,
 } from 'lucide-react';
 import { Drawing, AttachedDrawingFile } from '../types';
 import { api } from '../services/api';
+import { useGoogleDrivePicker } from '../hooks/useGoogleDrivePicker';
 
 interface AddDrawingFileModalProps {
   isOpen: boolean;
@@ -94,6 +96,7 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
   // Google Drive State
   const [googleDriveUrl, setGoogleDriveUrl] = useState('');
   const [googleDriveFileName, setGoogleDriveFileName] = useState('');
+  const { openPicker, isReady: isPickerReady } = useGoogleDrivePicker();
 
   // Cloud URL state
   const [cloudUrl, setCloudUrl] = useState('');
@@ -600,16 +603,37 @@ export const AddDrawingFileModal: React.FC<AddDrawingFileModalProps> = ({
                     </p>
                   </div>
                   <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
-                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">2. เปิดแชร์ลิงก์</span>
+                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">2. เลือกไฟล์ / วางลิงก์</span>
                     <p className="text-[10px] text-slate-400">
-                      คลิกขวาที่ไฟล์ &rarr; แชร์ (Share) &rarr; เลือก <strong>ทุกคนที่มีลิงก์ (Anyone with the link)</strong>
+                      คลิกปุ่มเลือกไฟล์จาก Drive หรือ นำลิงก์แชร์มาวางในช่องด้านล่าง
                     </p>
                   </div>
-                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800">
-                    <span className="font-bold text-emerald-400 block mb-1 text-[11px]">3. วางลิงก์ที่นี่</span>
-                    <p className="text-[10px] text-slate-400">
-                      คัดลอกลิงก์มาวางในช่องด้านล่าง ระบบจะถอดรหัส File ID และจัดเตรียมวิวเวอร์ให้อัตโนมัติ
-                    </p>
+                  <div className="p-2.5 bg-slate-900/90 rounded-xl border border-slate-800 flex items-center justify-center">
+                    <button
+                      type="button"
+                      disabled={!isPickerReady}
+                      onClick={async () => {
+                        try {
+                          const files = await openPicker();
+                          if (files.length > 0) {
+                            const file = files[0];
+                            setGoogleDriveUrl(file.url);
+                            setGoogleDriveFileName(file.name);
+                            // Auto detect simple types
+                            if (file.name.toLowerCase().endsWith('.pdf')) setFileType('PDF');
+                            else if (file.name.toLowerCase().endsWith('.dxf')) setFileType('DXF');
+                            else if (file.name.toLowerCase().endsWith('.dwg')) setFileType('DWG');
+                            else if (file.name.toLowerCase().endsWith('.step') || file.name.toLowerCase().endsWith('.stp')) setFileType('STEP');
+                          }
+                        } catch (err: any) {
+                          setError(err.message || 'Google Drive picker failed');
+                        }
+                      }}
+                      className="w-full h-full px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span>เปิด Google Drive ของคุณ</span>
+                    </button>
                   </div>
                 </div>
               </div>

@@ -40,7 +40,8 @@ export const firebaseConfig = {
   appId: firebaseConfigRaw.appId,
   apiKey: firebaseConfigRaw.apiKey,
   authDomain: firebaseConfigRaw.authDomain,
-  firestoreDatabaseId: firebaseConfigRaw.firestoreDatabaseId || 'miyamoto-dwg-app-db',
+  // @ts-ignore
+  firestoreDatabaseId: 'miyamoto-dwg-app-db',
   storageBucket: firebaseConfigRaw.storageBucket,
   messagingSenderId: firebaseConfigRaw.messagingSenderId,
 };

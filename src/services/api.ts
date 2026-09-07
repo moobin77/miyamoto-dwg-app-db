@@ -342,7 +342,6 @@ class ApiService {
       const res = await fetch(`/api/series/${seriesId}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete series');
       return { success: true };
     } catch {
       return { success: true, offlineQueued: true };
@@ -565,7 +564,13 @@ class ApiService {
 
     try {
       const res = await fetch(`/api/models/${modelId}`, { method: 'DELETE' });
-      return res.json();
+      if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return await res.json();
+        }
+      }
+      return { success: true };
     } catch {
       addToOfflineQueue({
         action: 'DELETE_MODEL',
@@ -681,7 +686,13 @@ class ApiService {
 
     try {
       const res = await fetch(`/api/models/${modelId}/lengths/${lengthId}`, { method: 'DELETE' });
-      return res.json();
+      if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          return await res.json();
+        }
+      }
+      return { success: true };
     } catch {
       addToOfflineQueue({
         action: 'DELETE_LENGTH',
@@ -912,15 +923,38 @@ class ApiService {
       saveLocalDrawings(localDrawings);
     }
 
-    if (updates.modelName && d?.modelId) {
-      const depts = getLocalDepartments();
-      for (const dept of depts) {
-        const m = dept.models.find((mod) => mod.id === d.modelId);
-        if (m) {
-          m.name = updates.modelName;
-          saveLocalDepartments(depts);
+    // Update matching length variant in department models if applicable
+    const depts = getLocalDepartments();
+    let updatedDept: DepartmentInfo | null = null;
+    for (const dept of depts) {
+      for (const m of dept.models) {
+        if (m.id === d?.modelId) {
+          if (updates.modelName) {
+            m.name = updates.modelName;
+            updatedDept = dept;
+          }
+          const len = m.lengths.find((l) => l.drawingId === drawingId || l.id === d?.lengthVariantId);
+          if (len) {
+            if (updates.code) len.drawingCode = updates.code;
+            if (updates.partNumber) len.partNumber = updates.partNumber;
+            if (updates.lengthMm !== undefined) {
+              len.lengthMm = Number(updates.lengthMm);
+              len.lengthLabel = (updates as any).lengthLabel || `L = ${updates.lengthMm} mm`;
+              updatedDept = dept;
+            } else if ((updates as any).lengthLabel) {
+              len.lengthLabel = (updates as any).lengthLabel;
+              updatedDept = dept;
+            }
+          }
         }
       }
+    }
+    if (updatedDept) {
+      saveLocalDepartments(depts);
+      saveDepartmentToFirestore(updatedDept).catch(console.warn);
+    }
+    if (d) {
+      saveDrawingToFirestore(d).catch(console.warn);
     }
 
     if (!isOnline) {
@@ -939,9 +973,16 @@ class ApiService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
-      const data = await res.json();
+      if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          soundEffects.playClick();
+          return data;
+        }
+      }
       soundEffects.playClick();
-      return data;
+      return { success: true, drawing: d };
     } catch {
       addToOfflineQueue({
         action: 'UPDATE_DRAWING',
@@ -1082,12 +1123,19 @@ class ApiService {
       const res = await fetch(`/api/drawings/${drawingId}/files/${fileId}`, {
         method: 'DELETE',
       });
-      const data = await res.json();
-      if (data.drawing) {
-        saveDrawingToFirestore(data.drawing).catch(console.warn);
+      if (res.ok) {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.drawing) {
+            saveDrawingToFirestore(data.drawing).catch(console.warn);
+          }
+          soundEffects.playTrash();
+          return data;
+        }
       }
       soundEffects.playTrash();
-      return data;
+      return { success: true, drawing: d, deletedFileId: fileId };
     } catch {
       addToOfflineQueue({
         action: 'DELETE_ATTACHED_FILE',

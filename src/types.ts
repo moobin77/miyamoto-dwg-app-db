@@ -54,7 +54,7 @@ export interface AnnotationItem {
   color: string;
 }
 
-export type DepartmentId = 'SAS' | 'PTS' | 'OTS';
+export type DepartmentId = 'SAS' | 'PTS' | 'OTS' | 'BOM';
 
 export interface ProductSeries {
   id: string;
@@ -107,6 +107,7 @@ export interface DepartmentInfo {
 export interface UserProfile {
   uid: string;
   email: string;
+  username?: string;
   displayName: string;
   photoURL?: string;
   role: 'ADMIN' | 'ENGINEER' | 'OPERATOR';
@@ -147,9 +148,11 @@ export interface Drawing {
   unit: string;
   toleranceStandard: string;
   department?: DepartmentId;
+  seriesId?: string;
   modelId?: string;
   modelCode?: string;
   modelName?: string;
+  lengthVariantId?: string;
   lengthMm?: number;
   lengthLabel?: string;
   attachedFiles?: AttachedDrawingFile[];
@@ -201,7 +204,9 @@ export interface SyncStatus {
 
 export interface AuthorizedUser {
   id: string;
-  email: string;
+  email?: string;
+  username?: string;
+  password?: string;
   displayName: string;
   role: 'ADMIN' | 'ENGINEER' | 'OPERATOR';
   department?: DepartmentId | 'ALL';

@@ -27,6 +27,7 @@ import {
   FileText,
   Trash2,
   ShieldAlert,
+  Settings,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Drawing, DrawingVersion, CriticalDimension, AttachedDrawingFile } from '../types';
@@ -316,11 +317,19 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
           </div>
         </div>
 
-        {/* Action Buttons (Audit Trail, Diff, Inspector, Export, New Rev) */}
-        <div className="flex items-center gap-2">
-          {/* Version Diff Highlight Toggle */}
-          <button
-            onClick={() => setShowDiff(!showDiff)}
+        {/* Action Buttons (Hover Menu) */}
+        <div className="group relative mt-2 md:mt-0 w-full md:w-auto flex justify-end">
+          <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 hover:text-white transition shadow-sm">
+            <Settings className="w-4 h-4" />
+            <span>เครื่องมือ (Tools)</span>
+          </button>
+
+          {/* Dropdown Panel */}
+          <div className="absolute right-0 top-full mt-2 w-max max-w-sm bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 p-3 hidden group-hover:block transition-all origin-top-right">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Version Diff Highlight Toggle */}
+              <button
+                onClick={() => setShowDiff(!showDiff)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
               showDiff
                 ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
@@ -519,6 +528,8 @@ export const DrawingViewer: React.FC<DrawingViewerProps> = ({
             <PlusCircle className="w-3.5 h-3.5" />
             <span>ปรับปรุงแบบ</span>
           </button>
+            </div>
+          </div>
         </div>
       </div>
 

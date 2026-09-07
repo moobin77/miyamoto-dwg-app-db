@@ -58,9 +58,8 @@ import { EditModelModal } from './components/EditModelModal';
 import { AddDrawingFileModal } from './components/AddDrawingFileModal';
 import { SafeguardDeleteModal, SafeguardDeleteTarget } from './components/SafeguardDeleteModal';
 import { ManageSeriesModal } from './components/ManageSeriesModal';
-import { GmailAuthModal } from './components/GmailAuthModal';
 import { SecurityGateway } from './components/SecurityGateway';
-import { AccessControlModal } from './components/AccessControlModal';
+import { UserManagementModal } from './components/UserManagementModal';
 import { FirebaseSyncBadge } from './components/FirebaseSyncBadge';
 import {
   DATABASE_NAME,
@@ -404,10 +403,24 @@ export default function App() {
   }, []);
 
   // Update active version when selected drawing changes
-  const activeDrawing = drawings.find((d) => d.id === selectedDrawingId) || drawings[0];
+  const activeDrawing = drawings.find((d) => d.id === selectedDrawingId) || drawings[0] || null;
+
+  const effectiveActiveVersion =
+    activeVersion ||
+    activeDrawing?.versions?.[0] || {
+      version: activeDrawing?.currentVersion || 'Rev A',
+      releaseDate: new Date().toISOString().split('T')[0],
+      releasedBy: 'ฝ่ายวิศวกรรมการผลิต',
+      ecoNumber: 'INITIAL-RELEASE',
+      changeDescription: 'ออกเอกสารแบบสำหรับสายการผลิต',
+      changeDepartment: 'R&D / Production',
+      isApprovedForProduction: true,
+      svgType: (activeDrawing as any)?.svgType || 'shaft',
+      criticalDimensions: [],
+    };
 
   useEffect(() => {
-    if (activeDrawing) {
+    if (activeDrawing && activeDrawing.versions && activeDrawing.versions.length > 0) {
       setActiveVersion(activeDrawing.versions[0]);
     }
   }, [selectedDrawingId, activeDrawing?.currentVersion]);
@@ -720,17 +733,31 @@ export default function App() {
         setDrawings((prev) => prev.filter((d) => d.modelId !== deleteConfirm.modelId));
       } else if (deleteConfirm.type === 'LENGTH' && deleteConfirm.lengthId) {
         await api.deleteLength(deleteConfirm.modelId, deleteConfirm.lengthId);
+        let drawingIdToRemove = '';
         setDepartments((prev) =>
           prev.map((dept) => ({
             ...dept,
-            models: dept.models.map((m) =>
-              m.id === deleteConfirm.modelId
-                ? { ...m, lengths: m.lengths.filter((l) => l.id !== deleteConfirm.lengthId) }
-                : m
-            ),
+            models: dept.models.map((m) => {
+              if (m.id === deleteConfirm.modelId) {
+                const targetLen = m.lengths.find((l) => l.id === deleteConfirm.lengthId);
+                if (targetLen?.drawingId) drawingIdToRemove = targetLen.drawingId;
+                return {
+                  ...m,
+                  lengths: m.lengths.filter((l) => l.id !== deleteConfirm.lengthId),
+                };
+              }
+              return m;
+            }),
           }))
         );
-        setDrawings((prev) => prev.filter((d) => d.id !== `dwg-${deleteConfirm.lengthId}`));
+        setDrawings((prev) =>
+          prev.filter(
+            (d) =>
+              d.lengthVariantId !== deleteConfirm.lengthId &&
+              d.id !== `dwg-${deleteConfirm.lengthId}` &&
+              (!drawingIdToRemove || d.id !== drawingIdToRemove)
+          )
+        );
       }
 
       setSyncStatus((s) => ({
@@ -764,9 +791,8 @@ export default function App() {
     if (res.drawing) {
       setDrawings((prev) => prev.map((d) => (d.id === drawingId ? { ...d, ...res.drawing } : d)));
     }
-    if ((res as any).departments) {
-      setDepartments((res as any).departments);
-    }
+    const updatedDepts = getLocalDepartments();
+    setDepartments(updatedDepts);
     setSyncStatus((s) => ({
       ...s,
       pendingCount: getOfflineQueue().length,
@@ -1219,10 +1245,10 @@ export default function App() {
         )}
 
         {/* Drawing Viewport Stage */}
-        {activeDrawing && activeVersion ? (
+        {activeDrawing ? (
           <DrawingViewer
             drawing={activeDrawing}
-            activeVersion={activeVersion}
+            activeVersion={effectiveActiveVersion}
             onVersionChange={(ver) => setActiveVersion(ver)}
             onOpenAuditTrail={() => setIsAuditModalOpen(true)}
             onOpenDiffModal={() => setIsDiffModalOpen(true)}
@@ -1293,20 +1319,11 @@ export default function App() {
         }}
       />
 
-      {/* 1.3 Gmail / Google Account Sign In Modal */}
-      <GmailAuthModal
-        isOpen={isGmailAuthOpen}
-        onClose={() => setIsGmailAuthOpen(false)}
-        onSuccess={(user) => {
-          handleUnlock(user);
-        }}
-      />
-
       {/* 1.4 Access Control & Whitelist Modal (Admin) */}
-      <AccessControlModal
+      <UserManagementModal
         isOpen={isAccessControlOpen}
         onClose={() => setIsAccessControlOpen(false)}
-        currentUserEmail={currentUser?.email || ''}
+        currentUser={currentUser || undefined}
       />
 
       {/* 2. Add Length Modal (Admin) */}

@@ -1,12 +1,12 @@
 {
-  "projectId": "modified-kayak-qxjsq",
-  "appId": "1:158336945625:web:8cbcd595fde25756d35dc8",
-  "apiKey": "AIzaSyA-NQHQnBV6w32Hw0iYOGxCvC270upIjZU",
-  "authDomain": "modified-kayak-qxjsq.firebaseapp.com",
-  "firestoreDatabaseId": "miyamoto-dwg-app-db",
-  "storageBucket": "modified-kayak-qxjsq.firebasestorage.app",
-  "messagingSenderId": "158336945625",
+  "projectId": "gen-lang-client-0633139962",
+  "appId": "1:52270847191:web:f411efe4eb0a7a9d0d0c92",
+  "apiKey": "AIzaSyDCI-L-pANTfA0QlfkMSBg8QhB11bezCFM",
+  "authDomain": "gen-lang-client-0633139962.firebaseapp.com",
+  "firestoreDatabaseId": "ai-studio-clouddrawingtabl-af408e3f-e721-44cd-8aa1-3c63232ab3f6",
+  "storageBucket": "gen-lang-client-0633139962.firebasestorage.app",
+  "messagingSenderId": "52270847191",
   "measurementId": "",
-  "oAuthClientId": "158336945625-79h2tppvst6m8v4qrqc21pgjcjnfh9e9.apps.googleusercontent.com",
+  "oAuthClientId": "52270847191-edav67kh5ruf6e155bdcca89ucilcp57.apps.googleusercontent.com",
   "recaptchaSiteKey": ""
 }
