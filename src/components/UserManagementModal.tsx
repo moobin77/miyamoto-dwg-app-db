@@ -22,7 +22,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
-  const [newRole, setNewRole] = useState<'ADMIN' | 'ENGINEER' | 'OPERATOR'>('OPERATOR');
+  const [newRole, setNewRole] = useState<'ADMIN' | 'ENGINEER' | 'OPERATOR'>('ENGINEER');
   const [newDept, setNewDept] = useState<DepartmentId | 'ALL'>('ALL');
 
   // Edit Password State
@@ -230,9 +230,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       onChange={(e) => setNewRole(e.target.value as any)}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
                     >
-                      <option value="OPERATOR">Operator (ดูข้อมูลและบันทึกหน้าเครื่อง)</option>
                       <option value="ENGINEER">Engineer (จัดการแบบและพิจารณา ECO)</option>
-                      <option value="ADMIN">Admin (จัดการระบบเต็มรูปแบบ)</option>
                     </select>
                   </div>
                 </div>

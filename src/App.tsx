@@ -97,7 +97,7 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState<boolean>(() => {
     const session = getCurrentSession();
     if (!session) return false;
-    return session.role === 'ADMIN' || session.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+    return (session.email && session.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) || session.username === 'admin';
   });
 
   // Admin Modals
@@ -196,6 +196,41 @@ export default function App() {
   };
 
   // Load initial data from server
+
+  // 1-Hour hard limit for Operators
+  useEffect(() => {
+    let operatorTimeout: NodeJS.Timeout | null = null;
+    
+    if (currentUser && currentUser.role === 'OPERATOR') {
+      const loginTime = currentUser.loggedInAt ? new Date(currentUser.loggedInAt).getTime() : Date.now();
+      const ONE_HOUR = 60 * 60 * 1000; // 1 hour
+      const timeRemaining = (loginTime + ONE_HOUR) - Date.now();
+      
+      const kickOut = () => {
+        setCurrentUser(null);
+        setCurrentSession(null);
+        setIsLocked(true);
+        setScreenLocked(true);
+        setIsAdmin(false);
+        localStorage.removeItem('miyamoto_current_user');
+        alert('เซสชันของ Operator (หน้าเครื่อง) หมดอายุแล้ว (จำกัดเวลา 1 ชั่วโมง) ระบบได้ทำการออกจากระบบอัตโนมัติ');
+        window.location.reload();
+      };
+      
+      if (timeRemaining <= 0) {
+        kickOut();
+      } else {
+        operatorTimeout = setTimeout(() => {
+          kickOut();
+        }, timeRemaining);
+      }
+    }
+    
+    return () => {
+      if (operatorTimeout) clearTimeout(operatorTimeout);
+    };
+  }, [currentUser]);
+
   const loadData = useCallback(async () => {
     try {
       // 1. Fetch departments
@@ -689,7 +724,7 @@ export default function App() {
     setCurrentSession(user);
     setIsLocked(false);
     setScreenLocked(false);
-    if (user.role === 'ADMIN' || user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+    if ((user.email && user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) || user.username === 'admin') {
       setIsAdmin(true);
     } else {
       setIsAdmin(false);
