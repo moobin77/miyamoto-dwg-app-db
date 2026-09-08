@@ -75,6 +75,7 @@ import {
   isScreenLocked,
   setScreenLocked,
   fetchSecurityConfig,
+  logUserAccess,
 } from './services/securityService';
 import { soundEffects } from './services/sound';
 import { INITIAL_DEPARTMENTS } from './data/departmentsData';
@@ -208,6 +209,9 @@ export default function App() {
       const ONE_HOUR = 60 * 60 * 1000; // 1 hour
       
       const kickOut = () => {
+        if (currentUser) {
+          logUserAccess(currentUser, 'LOGOUT');
+        }
         setCurrentUser(null);
         setCurrentSession(null);
         setIsLocked(true);
@@ -728,6 +732,7 @@ export default function App() {
 
   // Security Gateway Unlocking & Session Management
   const handleUnlock = (user: UserProfile) => {
+    logUserAccess(user, 'LOGIN');
     setCurrentUser(user);
     setCurrentSession(user);
     setIsLocked(false);
@@ -747,6 +752,9 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    if (currentUser) {
+      logUserAccess(currentUser, 'LOGOUT');
+    }
     setCurrentUser(null);
     setCurrentSession(null);
     setIsLocked(true);

@@ -103,24 +103,7 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
         </div>
 
         <div className="bg-slate-900/80 backdrop-blur-xl rounded-3xl border border-slate-800 shadow-2xl overflow-hidden">
-          <div className="flex border-b border-slate-800">
-            <button
-              className={`flex-1 py-4 text-sm font-bold transition ${
-                activeTab === 'LOGIN' ? 'text-blue-400 border-b-2 border-blue-500 bg-blue-500/5' : 'text-slate-500 hover:text-slate-300'
-              }`}
-              onClick={() => setActiveTab('LOGIN')}
-            >
-              ล็อคอินบัญชี (Login)
-            </button>
-            <button
-              className={`flex-1 py-4 text-sm font-bold transition ${
-                activeTab === 'KIOSK_PIN' ? 'text-amber-400 border-b-2 border-amber-500 bg-amber-500/5' : 'text-slate-500 hover:text-slate-300'
-              }`}
-              onClick={() => setActiveTab('KIOSK_PIN')}
-            >
-              โหมดหน้าเครื่อง (Operator)
-            </button>
-          </div>
+          
 
           <div className="p-6 md:p-8">
             {errorMessage && (
@@ -130,7 +113,7 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
               </div>
             )}
 
-            {activeTab === 'LOGIN' && (
+            
               <form onSubmit={handleLoginSubmit} className="space-y-5">
                 <div>
                   <label className="text-xs font-bold text-slate-300 block mb-2">
@@ -141,7 +124,7 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
                     <input
                       type="text"
                       required
-                      placeholder="เช่น admin"
+                      placeholder="Username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       className="w-full bg-slate-950 border border-slate-700 pl-9 pr-3 py-2.5 rounded-xl text-sm text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
@@ -186,75 +169,8 @@ export const SecurityGateway: React.FC<SecurityGatewayProps> = ({
                   <span>เข้าสู่ระบบ</span>
                 </button>
               </form>
-            )}
 
-            {activeTab === 'KIOSK_PIN' && (
-              <form onSubmit={handleKioskPinSubmit} className="space-y-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-2">ไลน์เครื่อง</label>
-                    <select
-                      value={kioskDept}
-                      onChange={(e) => setKioskDept(e.target.value as DepartmentId)}
-                      className="w-full bg-slate-950 border border-slate-700 px-3 py-2.5 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="SAS">SAS - กระบอกสูบ</option>
-                      <option value="PTS">PTS - งานกลึง</option>
-                      <option value="OTS">OTS - ออปติก</option>
-                      <option value="BOM">BOM - รายการชิ้นส่วน</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-slate-300 block mb-2">ชื่อช่าง</label>
-                    <input
-                      type="text"
-                      placeholder="เช่น ช่างเจษฎา"
-                      value={nameInput}
-                      onChange={(e) => setNameInput(e.target.value)}
-                      required
-                      className="w-full bg-slate-950 border border-slate-700 px-3 py-2.5 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-2">
-                    PIN ปลดล็อคเครื่องจักร
-                  </label>
-                  <div className="relative">
-                    <KeyRound className="w-4 h-4 text-slate-500 absolute left-3 top-3" />
-                    <input
-                      type={showPin ? 'text' : 'password'}
-                      required
-                      placeholder="8899"
-                      value={pinInput}
-                      onChange={(e) => setPinInput(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 pl-9 pr-10 py-2.5 rounded-xl text-lg tracking-[0.5em] font-mono text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-center"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPin(!showPin)}
-                      className="absolute right-3 top-3.5 text-slate-400 hover:text-white transition p-0.5"
-                    >
-                      {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isVerifying}
-                  className="w-full py-3 mt-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 transition disabled:opacity-50"
-                >
-                  {isVerifying ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Unlock className="w-4 h-4" />
-                  )}
-                  <span>ปลดล็อคเครื่องจักร</span>
-                </button>
-              </form>
-            )}
+            
           </div>
         </div>
       </div>

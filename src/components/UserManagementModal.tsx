@@ -230,6 +230,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                       onChange={(e) => setNewRole(e.target.value as any)}
                       className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 outline-none"
                     >
+                      <option value="OPERATOR">Operator (ดูข้อมูลจำกัดเวลา 1 ชม.)</option>
                       <option value="ENGINEER">Engineer (จัดการแบบและพิจารณา ECO)</option>
                     </select>
                   </div>

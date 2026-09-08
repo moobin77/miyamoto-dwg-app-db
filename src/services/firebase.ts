@@ -406,6 +406,40 @@ export async function updateSystemStatus(totalDepartments: number, totalDrawings
 }
 
 // 6. Complete Sync: Push all existing departments and drawings to Firestore
+
+export async function backupDataToFirestore(
+  departments: DepartmentInfo[],
+  drawings: Drawing[]
+): Promise<void> {
+  try {
+    const db = getFirebaseDb();
+    const backupId = `backup_${Date.now()}`;
+    const backupDocRef = doc(db, 'backups', backupId);
+    
+    // Save metadata
+    await setDoc(backupDocRef, {
+      timestamp: new Date().toISOString(),
+      departmentCount: departments.length,
+      drawingCount: drawings.length,
+      status: 'COMPLETED'
+    });
+    
+    // Save collections inside backup document
+    const deptPromises = departments.map(dept => 
+      setDoc(doc(db, `backups/${backupId}/departments`, dept.id), dept)
+    );
+    const dwgPromises = drawings.map(dwg => 
+      setDoc(doc(db, `backups/${backupId}/drawings`, dwg.id), dwg)
+    );
+    
+    await Promise.all([...deptPromises, ...dwgPromises]);
+    console.log('Backup created successfully:', backupId);
+  } catch (err) {
+    console.error('Failed to create backup in Firebase:', err);
+    throw err;
+  }
+}
+
 export async function syncAllToFirebaseDatabase(
   departments: DepartmentInfo[],
   drawings: Drawing[],
@@ -414,6 +448,14 @@ export async function syncAllToFirebaseDatabase(
   try {
     await saveAllDepartmentsToFirestore(departments);
     await saveAllDrawingsToFirestore(drawings);
+    
+    // Also create a backup folder structure in Firebase
+    try {
+      await backupDataToFirestore(departments, drawings);
+    } catch(backupErr) {
+      console.warn('Backup non-fatal error:', backupErr);
+    }
+    
     for (const notif of notifications) {
       await saveNotificationToFirestore(notif);
     }

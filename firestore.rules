@@ -59,5 +59,18 @@ service cloud.firestore {
     match /access_requests/{reqId} {
       allow read, write: if isValidId(reqId);
     }
+
+    // Access/Login Logs
+    match /access_logs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Data Backups
+    match /backups/{backupId} {
+      allow read, write: if true;
+    }
+    match /backups/{backupId}/{subcollection}/{docId} {
+      allow read, write: if true;
+    }
   }
 }
