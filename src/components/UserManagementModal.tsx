@@ -79,7 +79,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUsername.trim() || !newPassword) return;
+    if (!newUsername.trim() || !newPassword) { alert('กรุณากรอกข้อมูลให้ครบถ้วน (Username และ Password)'); return; }
     try {
       await addAuthorizedUser({
         username: newUsername.trim().toLowerCase(),
@@ -97,7 +97,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
       loadUsers();
     } catch (err: any) {
       console.error(err);
-      alert('เพิ่มผู้ใช้ล้มเหลว: ' + err.message);
+      alert('เพิ่มผู้ใช้ล้มเหลว:\n' + (err.message || JSON.stringify(err)) + '\n\nตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสิทธิ์ในฐานข้อมูล');
     }
   };
 

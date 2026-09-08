@@ -197,14 +197,15 @@ export default function App() {
 
   // Load initial data from server
 
+  const [operatorTimeRemaining, setOperatorTimeRemaining] = useState<number | null>(null);
+
   // 1-Hour hard limit for Operators
   useEffect(() => {
-    let operatorTimeout: NodeJS.Timeout | null = null;
+    let interval: NodeJS.Timeout | null = null;
     
     if (currentUser && currentUser.role === 'OPERATOR') {
       const loginTime = currentUser.loggedInAt ? new Date(currentUser.loggedInAt).getTime() : Date.now();
       const ONE_HOUR = 60 * 60 * 1000; // 1 hour
-      const timeRemaining = (loginTime + ONE_HOUR) - Date.now();
       
       const kickOut = () => {
         setCurrentUser(null);
@@ -217,17 +218,24 @@ export default function App() {
         window.location.reload();
       };
       
-      if (timeRemaining <= 0) {
-        kickOut();
-      } else {
-        operatorTimeout = setTimeout(() => {
-          kickOut();
-        }, timeRemaining);
-      }
+      const updateTimer = () => {
+        const remaining = (loginTime + ONE_HOUR) - Date.now();
+        if (remaining <= 0) {
+           kickOut();
+           setOperatorTimeRemaining(0);
+        } else {
+           setOperatorTimeRemaining(remaining);
+        }
+      };
+
+      updateTimer();
+      interval = setInterval(updateTimer, 1000);
+    } else {
+       setOperatorTimeRemaining(null);
     }
     
     return () => {
-      if (operatorTimeout) clearTimeout(operatorTimeout);
+      if (interval) clearInterval(interval);
     };
   }, [currentUser]);
 
@@ -1107,6 +1115,16 @@ export default function App() {
               {currentUser.role} • Sign Out
             </button>
           </div>
+          
+          {operatorTimeRemaining !== null && (
+            <div className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-2 transition-colors ${operatorTimeRemaining < 300000 ? 'bg-red-500/20 text-red-400 border border-red-500/50 animate-pulse' : 'bg-slate-800 text-slate-300 border border-slate-700'}`}>
+              <span className="text-[10px] uppercase tracking-wider opacity-70">หมดเวลาใน</span>
+              <span>
+                {Math.floor(operatorTimeRemaining / 1000 / 60).toString().padStart(2, '0')}:
+                {(Math.floor(operatorTimeRemaining / 1000) % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+          )}
           
           <button 
             className="btn btn-primary bg-red-500 hover:bg-red-600" 
