@@ -39,6 +39,16 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     if (isOpen) {
       loadUsers();
       loadSecurityConfig();
+      // Reset form states
+      setIsAddingUser(false);
+      setNewUsername('');
+      setNewPassword('');
+      setNewName('');
+      setNewRole('ENGINEER');
+      setNewDept('ALL');
+      setEditingUserId(null);
+      setEditingPassword('');
+      setIsEditingKiosk(false);
     }
   }, [isOpen]);
 
@@ -236,7 +246,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
-                  <button type="button" onClick={() => setIsAddingUser(false)} className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 text-sm">
+                  <button type="button" onClick={() => { setIsAddingUser(false); setNewUsername(''); setNewPassword(''); setNewName(''); }} className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 text-sm">
                     ยกเลิก
                   </button>
                   <button type="submit" className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-500 text-sm font-bold">
